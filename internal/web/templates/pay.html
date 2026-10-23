@@ -9,7 +9,7 @@
 </head>
 <body>
 <main class="pay" data-status-url="{{.StatusURL}}" data-state="{{.State}}">
-  <p class="shop">{{.Shop}}</p>
+  <h1 class="shop">{{.Shop}}</h1>
   <p class="amount" aria-label="{{.AmountLabel}}">{{.Amount}}</p>
   {{if .Payable}}
   <a class="btn primary" href="{{.UPILink}}">{{.Button}}</a>

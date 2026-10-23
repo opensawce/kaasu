@@ -69,6 +69,8 @@ Headers: `X-Kaasu-Device`, `X-Kaasu-Timestamp`, `X-Kaasu-Nonce` (16 to 64 charac
 
 **Paisu moods (issue #34, rules only).** `paisu.Choose` picks one of five moods for merchant screens, by priority: worried (broken ledger or dead webhook), asleep (no live source), needs-ok (a held payment), happy (only right after a confirmation), otherwise waiting. Customer pages never show Paisu. The artwork and the template partial are not in this change.
 
+**Accessibility checks (issue #29, partial).** Tests read the templates and stylesheets and fail on: a missing `lang` or title, other than one `h1` per page, images without `alt`, decorative icons not hidden from screen readers, status pills without their word, removed focus outlines, buttons smaller than 44 px, and animation without a reduced-motion override. The pay page now has its heading and a visible focus ring.
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 
