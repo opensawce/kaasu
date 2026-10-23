@@ -30,6 +30,7 @@ Self-hosted UPI payment confirmation for small Indian shops. Customers pay any U
 - Wordmark: `kaasu`, lowercase, Bricolage Grotesque 800, tracking −0.04em.
 - Clear space: ½ coin width on all sides. Minimum: 16 px (favicon variant: larger coin, wider hole).
 - Don't: recolour the coin, add sound waves or letters, place on gold.
+- Social preview: `assets/brand/social-preview.png` (1280×640) for GitHub's repo card.
 
 ### Colour
 | Token | Hex | Use |
@@ -112,16 +113,45 @@ English, हिन्दी, தமிழ், తెలుగు, ಕನ್ನ�
 
 ## 5. Screens
 
-Images in `assets/screens/`.
+Artboards exported at 2× to `assets/screens/`. They set layout, tone and copy patterns; the running app is the source of truth.
 
-| Screen | Platform | Purpose |
+### Brand and assets
+
+**Brand sheet** — logo system, colour, type, status language and the coin's story on one page.
+<img src="assets/screens/brand.png" alt="Kaasu brand sheet: logo system, colour, type and status language" width="880">
+
+**Paisu** — five moods, one per payment state; happy only after a confirmed match.
+<img src="assets/screens/paisu.png" alt="Paisu character sheet: one mood per payment state" width="880">
+
+**Icons** — 24 px line icons and app icons from 16 to 1024 px.
+<img src="assets/screens/icons.png" alt="Kaasu icon set: line icons and app icons" width="880">
+
+**Marketing** — link preview, push notification, die-cut sticker, counter standee and empty states. No Paisu on customer-facing pieces.
+<img src="assets/screens/marketing.png" alt="Kaasu marketing assets: link preview, sticker, standee and empty states" width="880">
+
+### Website
+
+**Landing** — why Kaasu, how it works, security, install options, pricing and honest limits.
+<img src="assets/screens/website-landing.png" alt="Kaasu landing page" width="560">
+
+| Pay page | Payment confirmed |
+|---|---|
+| ![Customer pay page](assets/screens/website-pay.png) | ![Payment confirmed page](assets/screens/website-confirmed.png) |
+| Customer pays by UPI intent or QR; manual UTR entry and a waiting timeline. | Live receipt with a ticking clock, so a screenshot can't pass as proof. |
+
+### Apps
+
+| iPhone Home | iPhone Review | Android Forwarder |
 |---|---|---|
-| Landing | Web | Explain, install, pricing, honest limits |
-| Pay page | Web (phone) | Customer pays via UPI intent or QR; waiting timeline |
-| Payment confirmed | Web (phone) | Live receipt that a screenshot can't fake |
-| Home | iPhone | Today's total, sources health, latest payments |
-| Review | iPhone | Confirm or reject a held payment with evidence |
-| Forwarder | Android | Forward bank SMS/notifications; voice language |
-| Dashboard + menu bar | Mac | Orders, sources, menu-bar status |
-| Review queue | Windows | Expected vs bank-said, confirm with Windows Hello |
-| Languages | All | Picker, scripts, voice phrases |
+| ![iPhone home](assets/screens/iphone-home.png) | ![iPhone review](assets/screens/iphone-review.png) | ![Android Forwarder](assets/screens/android-forwarder.png) |
+| Today's total, alert-source health and the latest payments. | Confirm or reject a held payment, with every check and the raw alert. | Forwards signed bank SMS; voice language, battery warning and a test alert. |
+
+| Mac dashboard | Windows review |
+|---|---|
+| ![Mac dashboard and menu bar](assets/screens/mac-dashboard.png) | ![Windows review queue](assets/screens/windows-review.png) |
+| Orders, sources and ledger status, plus the menu-bar popover. | Expected vs bank-said amounts and UTRs; confirm with Windows Hello. |
+
+### Languages
+
+**Languages** — one picker everywhere, the pay page in every script, and voice phrases per merchant.
+<img src="assets/screens/languages.png" alt="Language picker, pay page in every script, and voice alerts" width="880">
