@@ -1,0 +1,57 @@
+name: release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+          - { goos: darwin, goarch: amd64 }
+          - { goos: darwin, goarch: arm64 }
+          - { goos: windows, goarch: amd64 }
+          - { goos: windows, goarch: arm64 }
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with: { go-version-file: go.mod }
+      - name: Build
+        env:
+          CGO_ENABLED: '0'
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          ext=""; [ "$GOOS" = windows ] && ext=".exe"
+          go build -trimpath -buildvcs=false -ldflags "-s -w -X main.version=$VERSION" -o "kaasu-$GOOS-$GOARCH$ext" ./cmd/kaasu
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with: { name: bin-${{ matrix.goos }}-${{ matrix.goarch }}, path: kaasu-* }
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write   # keyless cosign signing
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { path: dist, merge-multiple: true }
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum kaasu-* > SHA256SUMS
+      - uses: anchore/sbom-action@55dc4ee22412511ee8c3142cbea40418e6cec693 # v0.17.8
+        with: { path: dist, format: spdx-json, output-file: dist/kaasu.spdx.json }
+      - uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
+      - name: Sign
+        working-directory: dist
+        run: |
+          for f in kaasu-* SHA256SUMS; do cosign sign-blob --yes --output-signature "$f.sig" --output-certificate "$f.pem" "$f"; done
+      - uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191 # v2.0.8
+        with:
+          draft: true   # a person publishes the draft after checking it
+          generate_release_notes: true
+          files: dist/*
