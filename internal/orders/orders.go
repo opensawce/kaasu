@@ -204,7 +204,9 @@ func (s *Service) Create(ctx context.Context, in CreateInput, idemKey string) (O
 	if err != nil {
 		return Order{}, false, err
 	}
-	o.UPILink = upi.Link(acc.VPA, acc.DisplayName, o.AmountPaise, o.Note)
+	if o.State != "queued" {
+		o.UPILink = upi.Link(acc.VPA, acc.DisplayName, o.AmountPaise, o.Note)
+	}
 	return o, true, nil
 }
 
@@ -228,7 +230,9 @@ func scanOrder(r interface{ Scan(...any) error }) (Order, error) {
 		&o.ExpiresAt, &o.CreatedAt, &o.UpdatedAt, &o.ConfirmedAt, &vpa, &name); err != nil {
 		return Order{}, err
 	}
-	o.UPILink = upi.Link(vpa, name, o.AmountPaise, o.Note)
+	if o.State != "queued" && o.State != "created" {
+		o.UPILink = upi.Link(vpa, name, o.AmountPaise, o.Note)
+	}
 	return o, nil
 }
 
@@ -255,4 +259,30 @@ func (s *Service) Cancel(ctx context.Context, id string) (Order, error) {
 		return Order{}, err
 	}
 	return s.Get(ctx, id)
+}
+
+// Sweep promotes queued orders into slots whose hold has ended. Call it from the scheduler (card 08 job pool.sweep).
+func (s *Service) Sweep(ctx context.Context) error {
+	all, err := s.accs.List(ctx)
+	if err != nil {
+		return err
+	}
+	for _, acc := range all {
+		err := s.st.Tx(ctx, func(tx *sql.Tx) error {
+			promoted, err := s.pool.PromoteQueued(ctx, tx, acc.ID)
+			if err != nil {
+				return err
+			}
+			for _, id := range promoted {
+				if _, err := s.sm.Transition(ctx, tx, id, "awaiting", map[string]any{"reason": "slot_freed"}); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("sweep %s: %w", acc.ID, err)
+		}
+	}
+	return nil
 }
