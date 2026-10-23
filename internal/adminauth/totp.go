@@ -49,3 +49,6 @@ func Verify(secret []byte, input string, now time.Time, lastStep int64) (int64, 
 	}
 	return 0, false
 }
+
+// CodeAt returns the six-digit code for a time. Authenticator apps compute the same value; tests use it.
+func CodeAt(secret []byte, t time.Time) string { return code(secret, t, 6) }

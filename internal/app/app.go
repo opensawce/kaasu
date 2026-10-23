@@ -29,6 +29,7 @@ import (
 	"github.com/opensawce/kaasu/internal/states"
 	"github.com/opensawce/kaasu/internal/store"
 	"github.com/opensawce/kaasu/internal/web"
+	"github.com/opensawce/kaasu/internal/web/admin"
 	"github.com/opensawce/kaasu/internal/webhooks"
 )
 
@@ -92,6 +93,11 @@ func New(cfg config.Config, key secrets.MasterKey, log *slog.Logger) (*App, erro
 	a.Jobs.Every("pool.sweep", time.Minute)
 	a.Jobs.Every("nonces.purge", 5*time.Minute)
 	a.Server = server.New(cfg, log)
+	// The merchant dashboard is on the admin listener only.
+	dash := &admin.Dashboard{Auth: a.Admin, DB: st.Read(), Lang: "en", Now: clk.Now}
+	dashMux := http.NewServeMux()
+	dash.Register(dashMux)
+	a.Server.Mount("admin", "/admin/", dashMux)
 	// Metrics are served on the admin listener only.
 	a.Server.Mount("admin", "/metrics", obs.Handler(obs.NewMetrics()))
 	// Ingest is served only on the ingest listener; admin and public never see /ingest/.
