@@ -45,6 +45,8 @@ Headers: `X-Kaasu-Device`, `X-Kaasu-Timestamp`, `X-Kaasu-Nonce` (16 to 64 charac
 
 **HTTP baseline (issue #13).** Every listener wears the same protections: a strict Content-Security-Policy (`default-src 'self'`, no inline script), `nosniff`, `no-referrer`, `frame-ancestors 'none'`, HSTS only over TLS, a 15-second request limit, a 64 KB body cap, and panic recovery that returns a plain 500 with no stack. Rate limiting is a token bucket per key; client identity ignores forwarded headers unless a trusted proxy is configured.
 
+**Logs and metrics (issue #42).** Every log line passes a redaction handler: VPAs keep two characters of the name, 12-digit UTRs and long account numbers keep their last four digits, API keys and bearer tokens are masked. Requests carry an `X-Request-Id`. `/metrics` (Prometheus text) is served on the admin listener only.
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 
