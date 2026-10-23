@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/opensawce/kaasu/internal/accounts"
+	"github.com/opensawce/kaasu/internal/adminauth"
 	"github.com/opensawce/kaasu/internal/api"
 	"github.com/opensawce/kaasu/internal/clock"
 	"github.com/opensawce/kaasu/internal/config"
@@ -40,6 +41,7 @@ type App struct {
 	Accounts *accounts.Service
 	Orders   *orders.Service
 	Devices  *devices.Service
+	Admin    *adminauth.Service
 	Jobs     *scheduler.Runner
 	Server   *server.Server
 	cancel   context.CancelFunc
@@ -64,6 +66,7 @@ func New(cfg config.Config, key secrets.MasterKey, log *slog.Logger) (*App, erro
 	a.Accounts = accounts.New(st, clk, ids)
 	a.Orders = orders.New(st, clk, ids, a.Accounts)
 	a.Devices = devices.New(st, clk, cfg.PublicAddr)
+	a.Admin = adminauth.New(st, clk, a.Vault)
 	a.Jobs = scheduler.New(st, clk, ids, log)
 	a.Jobs.Register("orders.expire", func(ctx context.Context, _ scheduler.Job) error {
 		_, err := a.Orders.ExpireDue(ctx)

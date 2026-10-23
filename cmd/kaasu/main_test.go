@@ -155,3 +155,18 @@ func TestAccountAndAPIKeyCommands(t *testing.T) {
 		t.Fatalf("apikey new: code=%d out=%q", code, out.String())
 	}
 }
+
+func TestAdminInitPrintsEnrollmentOnce(t *testing.T) {
+	var kb bytes.Buffer
+	run([]string{"keygen"}, func(string) string { return "" }, &kb, &bytes.Buffer{})
+	envs := map[string]string{"KAASU_DATABASE_PATH": filepath.Join(t.TempDir(), "k.db"), "KAASU_MASTER_KEY": strings.TrimSpace(kb.String())}
+	getenv := func(k string) string { return envs[k] }
+	var out, errb bytes.Buffer
+	if code := run([]string{"admin", "init", "--name", "priya"}, getenv, &out, &errb); code != 0 || !strings.Contains(out.String(), "otpauth://totp/Kaasu:priya?secret=") {
+		t.Fatalf("code=%d out=%q err=%q", code, out.String(), errb.String())
+	}
+	out.Reset()
+	if code := run([]string{"admin", "init", "--name", "priya"}, getenv, &out, &errb); code == 0 {
+		t.Error("creating the same admin twice must fail")
+	}
+}
