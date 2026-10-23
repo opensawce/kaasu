@@ -1,8 +1,5 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/kaasu-logo-dark.png">
-    <img alt="kaasu" src="assets/brand/kaasu-logo-light.png" width="300">
-  </picture>
+  <img alt="kaasu" src="assets/brand/kaasu-logo-card.png" width="300">
 </p>
 
 <h3 align="center">Take UPI payments. Keep every rupee.</h3>
