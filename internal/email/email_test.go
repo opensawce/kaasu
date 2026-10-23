@@ -207,5 +207,3 @@ func FuzzEmailBody(f *testing.F) {
 		_, _ = bodyText(ct, strings.NewReader(body))
 	})
 }
-
-var _ = fmt.Sprint
