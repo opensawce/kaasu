@@ -1,0 +1,9 @@
+{
+  "Bank": "HDFC",
+  "AmountPaise": 49907,
+  "UTR": "629812345678",
+  "PayerMasked": "sa***@okicici",
+  "AccountHint": "1234",
+  "OccurredAt": "2026-10-22T18:30:00Z",
+  "Parser": "HDFC"
+}
