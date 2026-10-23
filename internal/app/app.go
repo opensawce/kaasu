@@ -26,6 +26,7 @@ import (
 	"github.com/opensawce/kaasu/internal/server"
 	"github.com/opensawce/kaasu/internal/states"
 	"github.com/opensawce/kaasu/internal/store"
+	"github.com/opensawce/kaasu/internal/webhooks"
 )
 
 type randomIDs struct{}
@@ -77,6 +78,11 @@ func New(cfg config.Config, key secrets.MasterKey, log *slog.Logger) (*App, erro
 			return err
 		})
 	})
+	hooks := webhooks.New(st, clk, a.Vault, false, log)
+	a.Jobs.Register("webhooks.deliver", func(ctx context.Context, _ scheduler.Job) error {
+		_, err := hooks.Deliver(ctx)
+		return err
+	})
 	a.Jobs.Register("jobs.purge", func(ctx context.Context, _ scheduler.Job) error {
 		return st.Tx(ctx, func(tx *sql.Tx) error {
 			_, err := tx.ExecContext(ctx, `DELETE FROM jobs WHERE status IN ('done','dead') AND created_at < ?`, clk.Now().Add(-7*24*time.Hour).UTC().Format(time.RFC3339))
@@ -84,7 +90,7 @@ func New(cfg config.Config, key secrets.MasterKey, log *slog.Logger) (*App, erro
 		})
 	})
 	for kind, every := range map[string]time.Duration{
-		"orders.expire": 5 * time.Second, "pool.sweep": time.Minute, "nonces.purge": 5 * time.Minute, "jobs.purge": time.Hour,
+		"webhooks.deliver": 5 * time.Second, "orders.expire": 5 * time.Second, "pool.sweep": time.Minute, "nonces.purge": 5 * time.Minute, "jobs.purge": time.Hour,
 	} {
 		if err := a.Jobs.Every(kind, every); err != nil {
 			_ = st.Close()
