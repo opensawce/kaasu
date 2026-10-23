@@ -65,6 +65,8 @@ Headers: `X-Kaasu-Device`, `X-Kaasu-Timestamp`, `X-Kaasu-Nonce` (16 to 64 charac
 
 **Merchant dashboard, first slice (issue #30, partial).** Mounted on the admin listener only. Sign-in is the TOTP form; every other page needs a session. Today shows money received today (IST), and a source health list where a device counts as live if it was seen in the last 15 minutes. Fewer than two live sources shows a warning; none says nothing is sending. Orders show the masked payer; a test checks a full VPA never reaches an admin page.
 
+**Review queue (issue #31).** Held payments wait in `internal/review`. The queue shows the expected amount next to what the bank said, the score breakdown and reason, and the raw alert (escaped on display). Confirm moves the order to confirmed, or to late-paid if its window has passed; reject needs one reason from a fixed list. Both write the owner's name into the ledger. On the admin listener a decision needs the owner role, a valid CSRF token and a fresh sign-in (five minutes); staff get 403. A second decision on the same order is refused.
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 

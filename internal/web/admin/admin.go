@@ -13,14 +13,16 @@ import (
 	"github.com/opensawce/kaasu/i18n"
 	"github.com/opensawce/kaasu/internal/adminauth"
 	"github.com/opensawce/kaasu/internal/evidence"
+	"github.com/opensawce/kaasu/internal/review"
 )
 
 // Dashboard holds what the pages need.
 type Dashboard struct {
-	Auth *adminauth.Service
-	DB   *sql.DB // read pool
-	Lang i18n.Lang
-	Now  func() time.Time
+	Auth   *adminauth.Service
+	DB     *sql.DB // read pool
+	Lang   i18n.Lang
+	Now    func() time.Time
+	Review *review.Service
 }
 
 var (
@@ -46,6 +48,63 @@ func (d *Dashboard) Register(m *http.ServeMux) {
 	m.HandleFunc("POST /admin/login", d.loginPost)
 	m.Handle("GET /admin/{$}", d.auth(http.HandlerFunc(d.today)))
 	m.Handle("GET /admin/orders", d.auth(http.HandlerFunc(d.orders)))
+	m.Handle("POST /admin/review/{id}/confirm", d.auth(http.HandlerFunc(d.confirm)))
+	m.Handle("POST /admin/review/{id}/reject", d.auth(http.HandlerFunc(d.reject)))
+}
+
+// decide checks the decision rules for a review action: owner only, a valid CSRF token, and fresh sign-in.
+func (d *Dashboard) decide(w http.ResponseWriter, r *http.Request) (adminauth.Admin, bool) {
+	c, err := r.Cookie(adminauth.CookieName)
+	if err != nil {
+		http.Redirect(w, r, "/admin/login", http.StatusSeeOther)
+		return adminauth.Admin{}, false
+	}
+	a, err := d.Auth.Authenticate(r.Context(), c.Value)
+	if err != nil {
+		http.Redirect(w, r, "/admin/login", http.StatusSeeOther)
+		return adminauth.Admin{}, false
+	}
+	if err := adminauth.RequireOwner(a); err != nil {
+		http.Error(w, "Only the owner can decide payments.", http.StatusForbidden)
+		return a, false
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return a, false
+	}
+	if err := d.Auth.CheckCSRF(r.Context(), c.Value, r.PostFormValue("csrf")); err != nil {
+		http.Error(w, "The form expired. Reload the page.", http.StatusForbidden)
+		return a, false
+	}
+	if err := d.Auth.RequireFresh(r.Context(), c.Value); err != nil {
+		http.Error(w, "Confirm with your code to continue.", http.StatusForbidden)
+		return a, false
+	}
+	return a, true
+}
+
+func (d *Dashboard) confirm(w http.ResponseWriter, r *http.Request) {
+	a, ok := d.decide(w, r)
+	if !ok {
+		return
+	}
+	if err := d.Review.Confirm(r.Context(), r.PathValue("id"), "admin:"+a.Name); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	http.Redirect(w, r, "/admin/review", http.StatusSeeOther)
+}
+
+func (d *Dashboard) reject(w http.ResponseWriter, r *http.Request) {
+	a, ok := d.decide(w, r)
+	if !ok {
+		return
+	}
+	if err := d.Review.Reject(r.Context(), r.PathValue("id"), r.PostFormValue("reason"), "admin:"+a.Name); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	http.Redirect(w, r, "/admin/review", http.StatusSeeOther)
 }
 
 func (d *Dashboard) auth(next http.Handler) http.Handler { return d.Auth.Require(next) }
