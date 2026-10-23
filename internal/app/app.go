@@ -11,7 +11,10 @@ import (
 	"github.com/opensawce/kaasu/internal/api"
 	"github.com/opensawce/kaasu/internal/clock"
 	"github.com/opensawce/kaasu/internal/config"
+	"github.com/opensawce/kaasu/internal/devices"
+	"github.com/opensawce/kaasu/internal/evidence"
 	"github.com/opensawce/kaasu/internal/id"
+	"github.com/opensawce/kaasu/internal/ingest"
 	"github.com/opensawce/kaasu/internal/orders"
 	"github.com/opensawce/kaasu/internal/secrets"
 	"github.com/opensawce/kaasu/internal/server"
@@ -29,6 +32,7 @@ type App struct {
 	Vault    *secrets.Vault
 	Accounts *accounts.Service
 	Orders   *orders.Service
+	Devices  *devices.Service
 	Server   *server.Server
 }
 
@@ -50,7 +54,12 @@ func New(cfg config.Config, key secrets.MasterKey, log *slog.Logger) (*App, erro
 	a.Vault = secrets.NewVault(st, key, clk)
 	a.Accounts = accounts.New(st, clk, ids)
 	a.Orders = orders.New(st, clk, ids, a.Accounts)
+	a.Devices = devices.New(st, clk, cfg.PublicAddr)
 	a.Server = server.New(cfg, log)
+	// Ingest is served only on the ingest listener; admin and public never see /ingest/.
+	a.Server.Mount("ingest", "/ingest/", ingest.Handler(ingest.Deps{
+		Store: st, Clock: clk, Devices: a.Devices, Evidence: evidence.New(clk, ids),
+	}))
 	a.Server.Mount("public", "/v1/", api.New(api.Deps{Log: log, Orders: a.Orders, Vault: a.Vault}))
 	return a, nil
 }
