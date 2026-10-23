@@ -1,0 +1,39 @@
+/* Code generated from assets/tokens.json; DO NOT EDIT. */
+:root {
+  --amber: #9A5410;
+  --amber-tint: #FBEBD6;
+  --body: #3D4247;
+  --gold: #E8A33D;
+  --green: #0F7B5F;
+  --green-deep: #0A5C47;
+  --green-tint: #E3F2EC;
+  --grey: #5B6168;
+  --ink: #14171A;
+  --line: #E3E1DA;
+  --mint: #3FC59A;
+  --paper: #F7F6F2;
+  --red: #B42318;
+  --red-tint: #FDECEA;
+  --white: #FFFFFF;
+  --status-needs-ok-fg: #9A5410;
+  --status-needs-ok-bg: #FBEBD6;
+  --status-offline-fg: #5B6168;
+  --status-offline-bg: #E3E1DA;
+  --status-problem-fg: #B42318;
+  --status-problem-bg: #FDECEA;
+  --status-received-fg: #0A5C47;
+  --status-received-bg: #E3F2EC;
+  --status-waiting-fg: #5B6168;
+  --status-waiting-bg: #E3E1DA;
+  --space-0: 4px;
+  --space-1: 8px;
+  --space-2: 12px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 32px;
+  --space-6: 48px;
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+  --touch: 44px;
+}
