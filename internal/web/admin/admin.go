@@ -13,7 +13,7 @@ import (
 	"github.com/opensawce/kaasu/internal/adminauth"
 	"github.com/opensawce/kaasu/internal/evidence"
 	"github.com/opensawce/kaasu/internal/review"
-	"github.com/opensawce/kaasu/internal/setup"
+	wizard "github.com/opensawce/kaasu/internal/setup"
 )
 
 // Dashboard holds what the pages need.
@@ -148,7 +148,7 @@ func (d *Dashboard) today(w http.ResponseWriter, r *http.Request) {
 	var total int64
 	var count int
 	_ = d.DB.QueryRowContext(r.Context(), `SELECT COALESCE(SUM(amount_paise),0), count(*) FROM orders
-		WHERE state IN ('confirmed','late_paid') AND confirmed_at >= ? AND COALESCE(reference,'') <> ?`, start, setup.TestReference).Scan(&total, &count)
+		WHERE state IN ('confirmed','late_paid') AND confirmed_at >= ? AND COALESCE(reference,'') <> ?`, start, wizard.TestReference).Scan(&total, &count)
 	srcs, active := d.sources(r.Context(), now.UTC())
 	l := d.Lang
 	// Fewer than two live sources is a warning: one source is a single point of failure, none means nothing is seen.
