@@ -23,6 +23,12 @@ Diagrams are drawn in Eraser. Source: `assets/diagrams/*.eraser` · Images: `ass
 
 **Bank alert parsers (issue #16).** One pattern per bank (HDFC, SBI, ICICI, Axis, Kotak) reads credits only; debits, promos and anything unrecognised return `ErrUnknownFormat` and never confirm an order. Amounts are read as integer paise from the digit string (commas stripped, no floats). Times are read in IST and stored as UTC. Sender ids and email domains are allow-listed; a look-alike such as `hdfcbank.net.evil.io` matches nothing. Fixtures are synthetic and checked against golden files.
 
+**Signed ingest (issue #14).** Phones and mail sources reach the server only on the ingest listener (`/ingest/v1/...`), never on public or admin. Pairing uses a single-use token valid 10 minutes, stored as a hash, shown as a `kaasu://pair` link. Every alert request is signed with the device's Ed25519 key over this exact string:
+```
+KAASU-INGEST-V1\n<deviceID>\n<unixSeconds>\n<nonce>\n<hex(sha256(body))>
+```
+Headers: `X-Kaasu-Device`, `X-Kaasu-Timestamp`, `X-Kaasu-Nonce` (16 to 64 characters), `X-Kaasu-Signature` (base64). A request is accepted when its timestamp is within 60 seconds of server time, the signature verifies and the device is paired and not revoked. Nonces are stored per device; a repeat is `409 replay`. Every other failure is `401 unauthorized` with no detail. Raw evidence is stored as received, before parsing.
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 
