@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="{{.Lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}}</title>
+<link rel="stylesheet" href="/static/tokens.css">
+<link rel="stylesheet" href="/static/pay.css">
+<link rel="stylesheet" href="/static/done.css">
+</head>
+<body>
+<main class="pay done">
+  <svg class="tick" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>
+  <h1>{{.Title2}}</h1>
+  <p class="amount">{{.Amount}}</p>
+  <p class="live" data-since="{{.ConfirmedUnix}}"><span id="ago">{{.Ago}}</span></p>
+  <dl class="receipt">
+    <dt>{{.PaidTo}}</dt><dd>{{.Shop}}</dd>
+    <dt>{{.UTRLabel}}</dt><dd>{{.UTR}}</dd>
+    <dt>{{.TimeLabel}}</dt><dd>{{.ConfirmedAt}}</dd>
+    <dt>{{.RefLabel}}</dt><dd>{{.Reference}}</dd>
+    <dt>{{.CodeLabel}}</dt><dd><code>{{.Code}}</code></dd>
+  </dl>
+  <p><a href="/pay/{{.OrderID}}/receipt">{{.SaveReceipt}}</a></p>
+</main>
+<script src="/static/done.js" defer></script>
+</body>
+</html>

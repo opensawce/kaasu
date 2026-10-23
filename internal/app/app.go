@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/opensawce/kaasu/internal/accounts"
@@ -100,8 +101,11 @@ func New(cfg config.Config, key secrets.MasterKey, log *slog.Logger) (*App, erro
 	}))
 	a.Server.Mount("public", "/v1/", api.New(api.Deps{Orders: a.Orders, Vault: a.Vault}))
 	pay := &web.Pay{Orders: a.Orders, ShopName: "Kaasu", ShopLang: "en"}
-	a.Server.Mount("public", "/pay/", pay.Handler())
-	a.Server.Mount("public", "/static/", pay.Handler())
+	payMux := http.NewServeMux()
+	pay.Register(payMux)
+	web.NewConfirmed(a.Orders, st, "Kaasu", "en", clk.Now).Register(payMux)
+	a.Server.Mount("public", "/pay/", payMux)
+	a.Server.Mount("public", "/static/", web.StaticHandler())
 	return a, nil
 }
 

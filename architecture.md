@@ -55,6 +55,8 @@ Headers: `X-Kaasu-Device`, `X-Kaasu-Timestamp`, `X-Kaasu-Nonce` (16 to 64 charac
 
 **Customer pay page (issue #23).** `/pay/{id}` shows the exact amount, one primary button that names the amount and opens the UPI link, the waiting steps, and "Already paid? Don't pay again." Copy comes only from the catalogue. Waiting states never say "failed". `/pay/{id}/status` returns the state alone; `pay.js` polls it every two seconds with no third-party code. The page has no inline script, no third-party request, and stays under 30 KB. Language comes from `?lang=` (kept in a cookie), then the browser, then the shop default.
 
+**Payment confirmed page (issue #24).** `/pay/{id}/done` shows the success screen only when the order is confirmed or late-paid; anything else redirects back to the pay page, and the URL can never make success appear. It shows the amount from the order (a `?amount=` query is ignored), a live "time since confirmed" counter, the UTR, time, reference and a six-character check code. The code is an HMAC of the order, the confirmation time and the amount, so the shopkeeper can compare it. `/pay/{id}/receipt` is the printable receipt (`?format=txt` for plain text). The tick animation respects reduced motion. Paisu never appears on customer pages.
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 

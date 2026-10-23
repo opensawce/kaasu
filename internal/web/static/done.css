@@ -1,0 +1,9 @@
+.done { text-align: center; }
+.tick { width: 72px; height: 72px; color: var(--status-received-fg); stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tick path { stroke-dasharray: 20; stroke-dashoffset: 20; animation: draw .5s ease forwards; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+.receipt { text-align: left; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; }
+.receipt dt { color: var(--grey); }
+.receipt dd { margin: 0; font-variant-numeric: tabular-nums; }
+@media print { .tick, .live, a { display: none; } }
+@media (prefers-reduced-motion: reduce) { .tick path { animation: none; stroke-dashoffset: 0; } }
