@@ -18,9 +18,9 @@ type Tokens struct {
 		Icon string `json:"icon"`
 		Word string `json:"word"`
 	} `json:"status"`
-	Space  []int `json:"space"`
+	Space  []int          `json:"space"`
 	Radius map[string]int `json:"radius"`
-	Touch  int `json:"touch"`
+	Touch  int            `json:"touch"`
 }
 
 // CSS renders the custom properties. Used by the generator and by the test that checks the file is current.
