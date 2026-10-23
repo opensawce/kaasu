@@ -27,12 +27,22 @@ type Pay struct {
 	ShopLang i18n.Lang
 }
 
-// Handler mounts the pages. Call it from the public listener.
-func (p *Pay) Handler() http.Handler {
-	m := http.NewServeMux()
+// Register adds the pay routes to m.
+func (p *Pay) Register(m *http.ServeMux) {
 	m.HandleFunc("GET /pay/{id}", p.page)
 	m.HandleFunc("GET /pay/{id}/status", p.status)
-	m.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(mustSub(assets, "static")))))
+}
+
+// StaticHandler serves the embedded assets (CSS, JS).
+func StaticHandler() http.Handler {
+	return http.StripPrefix("/static/", http.FileServer(http.FS(mustSub(assets, "static"))))
+}
+
+// Handler is the pay pages and static assets on one mux.
+func (p *Pay) Handler() http.Handler {
+	m := http.NewServeMux()
+	p.Register(m)
+	m.Handle("GET /static/", StaticHandler())
 	return m
 }
 
