@@ -22,6 +22,7 @@ import (
 	"github.com/opensawce/kaasu/internal/ledger"
 	"github.com/opensawce/kaasu/internal/obs"
 	"github.com/opensawce/kaasu/internal/secrets"
+	"github.com/opensawce/kaasu/internal/sim"
 	"github.com/opensawce/kaasu/internal/store"
 )
 
@@ -59,6 +60,8 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		return rotateKey(getenv, stdout, stderr)
 	case "admin":
 		return admin(args[1:], getenv, stdout, stderr)
+	case "sim":
+		return simCmd(args[1:], stdout, stderr)
 	case "account":
 		return account(args[1:], getenv, stdout, stderr)
 	case "apikey":
@@ -183,6 +186,18 @@ func openApp(getenv func(string) string, stderr io.Writer, quiet bool) (*app.App
 		return nil, nil, false
 	}
 	return a, log, true
+}
+
+// simCmd lists the payment scenarios. Running one needs a paired device; that is wired with dev mode.
+func simCmd(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 1 && args[0] == "--list" {
+		for _, sc := range sim.All() {
+			fmt.Fprintf(stdout, "%-18s %s (ends %s)\n", sc.Name, sc.Description, sc.Expect)
+		}
+		return 0
+	}
+	fmt.Fprintln(stderr, "usage: kaasu sim --list  (running a scenario needs dev mode, not yet built)")
+	return 2
 }
 
 // admin init creates an admin with a fresh TOTP secret and prints the authenticator link once.
