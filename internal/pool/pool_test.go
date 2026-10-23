@@ -188,7 +188,8 @@ func TestPromoteQueuedIsFIFO(t *testing.T) {
 	if err := e.st.Read().QueryRow(`SELECT state, amount_paise FROM orders WHERE id='q_early'`).Scan(&state, &amt); err != nil {
 		t.Fatal(err)
 	}
-	if state != "awaiting" || amt != 49900 {
+	// Pool sets the slot only; states.Transition moves the state.
+	if state != "queued" || amt != 49900 {
 		t.Errorf("promoted order: state=%s amount=%d", state, amt)
 	}
 }
@@ -392,14 +393,6 @@ func TestPromoteFailuresAreReturned(t *testing.T) {
 		injectFailure(t, e, `CREATE TRIGGER no_update BEFORE UPDATE ON orders BEGIN SELECT RAISE(ABORT, 'boom'); END`)
 		if _, err := promote(e); err == nil {
 			t.Error("a failed order update must be an error")
-		}
-	})
-	t.Run("ledger write fails", func(t *testing.T) {
-		e := setup(t)
-		mkOrder(t, e, "q_1", e.acc.ID, "queued", exp, "2026-01-01T10:01:00Z")
-		injectFailure(t, e, `CREATE TRIGGER no_ledger BEFORE INSERT ON ledger BEGIN SELECT RAISE(ABORT, 'boom'); END`)
-		if _, err := promote(e); err == nil {
-			t.Error("a failed ledger write must be an error")
 		}
 	})
 }

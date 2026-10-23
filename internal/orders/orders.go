@@ -14,8 +14,8 @@ import (
 
 	"github.com/opensawce/kaasu/internal/accounts"
 	"github.com/opensawce/kaasu/internal/clock"
-	"github.com/opensawce/kaasu/internal/ledger"
 	"github.com/opensawce/kaasu/internal/pool"
+	"github.com/opensawce/kaasu/internal/states"
 	"github.com/opensawce/kaasu/internal/store"
 	"github.com/opensawce/kaasu/internal/upi"
 )
@@ -69,10 +69,12 @@ type Service struct {
 	ids  IDSource
 	accs *accounts.Service
 	pool *pool.Pool
+	sm   *states.Machine
 }
 
 func New(st *store.Store, clk clock.Clock, ids IDSource, accs *accounts.Service) *Service {
-	return &Service{st: st, clk: clk, ids: ids, accs: accs, pool: pool.New(st, clk)}
+	p := pool.New(st, clk)
+	return &Service{st: st, clk: clk, ids: ids, accs: accs, pool: p, sm: states.New(clk, p)}
 }
 
 func invalid(format string, a ...any) error {
@@ -177,26 +179,24 @@ func (s *Service) Create(ctx context.Context, in CreateInput, idemKey string) (O
 			VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, o.ID, o.AccountID, o.BaseAmountPaise, o.AmountPaise, o.State, nullable(o.Reference), nullable(o.Note), idemKey, hash, o.ExpiresAt, o.CreatedAt, o.UpdatedAt); err != nil {
 			return err
 		}
+		to := "awaiting"
 		amt, err := s.pool.Reserve(ctx, tx, acc.ID, o.ID, in.AmountPaise, expires)
 		switch {
 		case errors.Is(err, pool.ErrPoolFull):
-			o.State = "queued"
-			if _, err := tx.ExecContext(ctx, `UPDATE orders SET state = 'queued', queued_at = ? WHERE id = ?`, o.CreatedAt, o.ID); err != nil {
-				return err
-			}
-			_, err = ledger.Append(ctx, tx, s.clk, ledger.Entry{Kind: "order.queued", OrderID: o.ID,
-				Payload: map[string]any{"amount_paise": o.AmountPaise, "account_id": o.AccountID}})
-			return err
+			to = "queued"
 		case err != nil:
 			return err
+		default:
+			o.AmountPaise = amt
+			if _, err := tx.ExecContext(ctx, `UPDATE orders SET amount_paise = ? WHERE id = ?`, amt, o.ID); err != nil {
+				return err
+			}
 		}
-		o.State, o.AmountPaise = "awaiting", amt
-		if _, err := tx.ExecContext(ctx, `UPDATE orders SET state = 'awaiting', amount_paise = ? WHERE id = ?`, amt, o.ID); err != nil {
+		if _, err := s.sm.Transition(ctx, tx, o.ID, to, map[string]any{"amount_paise": o.AmountPaise, "account_id": o.AccountID, "reference": o.Reference}); err != nil {
 			return err
 		}
-		_, err = ledger.Append(ctx, tx, s.clk, ledger.Entry{Kind: "order.created", OrderID: o.ID,
-			Payload: map[string]any{"amount_paise": o.AmountPaise, "account_id": o.AccountID, "reference": o.Reference}})
-		return err
+		o.State = to
+		return nil
 	})
 	if errors.Is(err, errRace) {
 		return s.Create(ctx, in, idemKey) // the other request won; this call replays it
@@ -243,35 +243,15 @@ func (s *Service) Get(ctx context.Context, id string) (Order, error) {
 // Cancel stops an order that has not been paid or expired.
 func (s *Service) Cancel(ctx context.Context, id string) (Order, error) {
 	err := s.st.Tx(ctx, func(tx *sql.Tx) error {
-		var state string
-		if err := tx.QueryRowContext(ctx, `SELECT state FROM orders WHERE id = ?`, id).Scan(&state); errors.Is(err, sql.ErrNoRows) {
-			return ErrNotFound
-		} else if err != nil {
-			return err
-		}
-		switch state {
-		case "created", "queued", "awaiting":
-		default:
-			return ErrNotCancellable
-		}
-		var accountID string
-		if err := tx.QueryRowContext(ctx, `SELECT account_id FROM orders WHERE id = ?`, id).Scan(&accountID); err != nil {
-			return err
-		}
-		now := s.clk.Now().UTC().Format(time.RFC3339)
-		if _, err := tx.ExecContext(ctx, `UPDATE orders SET state='cancelled', updated_at=? WHERE id=?`, now, id); err != nil {
-			return err
-		}
-		if _, err := ledger.Append(ctx, tx, s.clk, ledger.Entry{Kind: "order.cancelled", OrderID: id, Payload: map[string]any{"from": state}}); err != nil {
-			return err
-		}
-		if err := s.pool.Release(ctx, tx, id); err != nil {
-			return err
-		}
-		_, err := s.pool.PromoteQueued(ctx, tx, accountID)
+		_, err := s.sm.Transition(ctx, tx, id, "cancelled", nil)
 		return err
 	})
-	if err != nil {
+	switch {
+	case errors.Is(err, states.ErrNotFound):
+		return Order{}, ErrNotFound
+	case errors.Is(err, states.ErrIllegal):
+		return Order{}, ErrNotCancellable
+	case err != nil:
 		return Order{}, err
 	}
 	return s.Get(ctx, id)
