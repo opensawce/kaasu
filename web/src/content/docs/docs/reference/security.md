@@ -1,6 +1,6 @@
 ---
 title: Security
-description: How Kaasu protects your shop.
+description: How Kaasu protects your shop with signed alerts, verified email, safe sign-in and a checkable ledger.
 ---
 
 - **Three separate doors.** Customer pages, device alerts and the admin screen are served separately. Admin is reachable only from your own machine or VPN.
