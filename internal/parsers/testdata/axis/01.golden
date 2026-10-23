@@ -1,0 +1,9 @@
+{
+  "Bank": "Axis",
+  "AmountPaise": 29900,
+  "UTR": "629812345678",
+  "PayerMasked": "R***",
+  "AccountHint": "1234",
+  "OccurredAt": "2026-10-22T18:30:00Z",
+  "Parser": "Axis"
+}

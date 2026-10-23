@@ -21,6 +21,8 @@ Diagrams are drawn in Eraser. Source: `assets/diagrams/*.eraser` · Images: `ass
 
 **Evidence and dedupe (issue #15).** Raw alerts are stored byte-for-byte with their SHA-256; the same body twice is one row. A parsed payment is keyed by its UTR; when the UTR is missing it is keyed by a fingerprint of account hint, amount and a 5-minute time bucket. A second source for a known payment adds an `alert_sources` row instead of a new alert. Stored payer data is masked (`ra***@okicici`); the ledger records alert facts but never the raw text.
 
+**Bank alert parsers (issue #16).** One pattern per bank (HDFC, SBI, ICICI, Axis, Kotak) reads credits only; debits, promos and anything unrecognised return `ErrUnknownFormat` and never confirm an order. Amounts are read as integer paise from the digit string (commas stripped, no floats). Times are read in IST and stored as UTC. Sender ids and email domains are allow-listed; a look-alike such as `hdfcbank.net.evil.io` matches nothing. Fixtures are synthetic and checked against golden files.
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 
