@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/opensawce/kaasu/internal/clock"
+	"github.com/opensawce/kaasu/internal/ledger"
 	"github.com/opensawce/kaasu/internal/store"
 )
 
@@ -55,6 +56,16 @@ func New(st *store.Store, clk clock.Clock, ids IDSource) *Service {
 	return &Service{st: st, clk: clk, ids: ids}
 }
 
+// record writes the admin action to the ledger in the same transaction. Ledger rows have no order, so the account id goes in the payload.
+func (s *Service) record(ctx context.Context, tx *sql.Tx, kind, accountID string, extra map[string]any) error {
+	p := map[string]any{"account_id": accountID}
+	for k, v := range extra {
+		p[k] = v
+	}
+	_, err := ledger.Append(ctx, tx, s.clk, ledger.Entry{Kind: kind, Payload: p})
+	return err
+}
+
 func (in *Input) normalise() error {
 	in.VPA = strings.ToLower(strings.TrimSpace(in.VPA))
 	in.Bank = strings.TrimSpace(in.Bank)
@@ -95,7 +106,10 @@ func (s *Service) Create(ctx context.Context, in Input) (Account, error) {
 	err := s.st.Tx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `INSERT INTO receiving_accounts(`+cols+`) VALUES(?,?,?,?,?,1,?)`,
 			a.ID, a.VPA, a.Bank, a.DisplayName, a.AutoConfirmLimitPaise, a.CreatedAt)
-		return err
+		if err != nil {
+			return err
+		}
+		return s.record(ctx, tx, "account.created", a.ID, map[string]any{"vpa": a.VPA, "bank": a.Bank, "auto_confirm_limit_paise": a.AutoConfirmLimitPaise})
 	})
 	if isUnique(err) {
 		return Account{}, ErrDuplicate
@@ -142,7 +156,7 @@ func (s *Service) Update(ctx context.Context, id string, in Input) (Account, err
 		if n, _ := res.RowsAffected(); n == 0 {
 			return ErrNotFound
 		}
-		return nil
+		return s.record(ctx, tx, "account.updated", id, map[string]any{"vpa": in.VPA, "bank": in.Bank, "auto_confirm_limit_paise": in.AutoConfirmLimitPaise})
 	})
 	if isUnique(err) {
 		return Account{}, ErrDuplicate
@@ -163,7 +177,7 @@ func (s *Service) Deactivate(ctx context.Context, id string) error {
 		if n, _ := res.RowsAffected(); n == 0 {
 			return ErrNotFound
 		}
-		return nil
+		return s.record(ctx, tx, "account.deactivated", id, nil)
 	})
 }
 
@@ -184,6 +198,6 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 		if c, _ := res.RowsAffected(); c == 0 {
 			return ErrNotFound
 		}
-		return nil
+		return s.record(ctx, tx, "account.deleted", id, nil)
 	})
 }
