@@ -61,6 +61,8 @@ Headers: `X-Kaasu-Device`, `X-Kaasu-Timestamp`, `X-Kaasu-Nonce` (16 to 64 charac
 
 **Checkout snippet (issue #26, partial).** `kaasu.js` (under 3 KB, no dependencies, no inline handlers) opens the pay page by redirect or in a popup, and reports status from the pay page only when the message comes from that page's origin. `examples/webhooks/vectors.json` holds one signed delivery; the Go receiver example verifies it, and the other languages must do the same.
 
+**Voice announcements (issue #21, partial).** Only a confirmed or late-paid payment is ever spoken (`voice.Announcement`, tested over every state). The amount is read from the catalogue, in whole rupees when the paise are zero. The voice language is chosen separately from the screen language. `voice.js` speaks through the browser and remembers the last 50 order ids in session storage, so a reconnect never repeats a payment.
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 
