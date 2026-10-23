@@ -41,6 +41,8 @@ Headers: `X-Kaasu-Device`, `X-Kaasu-Timestamp`, `X-Kaasu-Nonce` (16 to 64 charac
 
 **Reconciliation (issue #32).** A bank statement is imported as CSV (per-bank mappings; generic fallback), with integer paise and a 10 MB and 100,000-row cap. Importing the same file twice stores it once. Reconciliation is read-only: confirmed orders are matched to credits by UTR from their auto-match alert, then by an unused credit of the exact amount (an order with a UTR may only fall back to a credit that carries no UTR). Each imported statement belongs to one receiving account and only matches that account's orders. Four buckets come out: matched, confirmed-but-missing (the owner can move these to disputed), credited-but-unmatched, and amount-mismatch (a UTR match whose credit differs from the confirmed order amount).
 
+**Admin sign-in (issue #12, partial).** Admin sign-in is TOTP (RFC 6238, SHA-1, 30 s, 6 digits, one step of skew, each code works once) with sessions stored only as hashes. Sessions last 12 hours absolute and 30 minutes idle. Five failures lock a name for five minutes; unknown names and wrong codes get the same reply. Sensitive actions need a code within the last five minutes (`RequireFresh`, `Reauth`). Staff are read-only (`RequireOwner`). Forms carry a CSRF token derived from the session. Passkeys are the intended primary method and are not built yet.
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 
