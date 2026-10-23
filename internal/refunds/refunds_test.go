@@ -93,7 +93,7 @@ func TestPartialThenFullRefund(t *testing.T) {
 	if s := e.state(t, id); s != "refunded" {
 		t.Fatalf("full refund: state=%s", s)
 	}
-	if n := e.count(t, fmt.Sprintf(`SELECT count(*) FROM outbox WHERE kind='order.refunded'`)); n != 1 {
+	if n := e.count(t, `SELECT count(*) FROM outbox WHERE kind='order.refunded'`); n != 1 {
 		t.Errorf("order.refunded webhook rows=%d", n)
 	}
 	list, err := e.svc.List(e.ctx, id)
