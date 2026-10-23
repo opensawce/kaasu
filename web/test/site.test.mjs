@@ -124,3 +124,10 @@ test('motion respects reduced-motion preference', () => {
   assert.match(read(join(root, 'src/styles/site.css')), /prefers-reduced-motion/);
   assert.match(read(join(root, 'src/components/Paisu.astro')), /prefers-reduced-motion/);
 });
+
+test('legal drafts carry the draft banner', () => {
+  for (const f of ['bank-terms.md', 'privacy.md']) {
+    const body = readFileSync(join(root, 'src/content/docs/docs/reference/', f), 'utf8');
+    assert.ok(body.includes('Draft'), `${f} needs the draft banner`);
+  }
+});
