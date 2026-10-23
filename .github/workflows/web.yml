@@ -1,12 +1,18 @@
 name: web
 on:
   pull_request:
-    paths: ['web/**']
+    paths: ['web/**', '.github/workflows/web.yml']
   push:
     branches: [main]
-    paths: ['web/**']
+    paths: ['web/**', '.github/workflows/web.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: web } }
     steps:
@@ -15,3 +21,22 @@ jobs:
         with: { node-version: 24, cache: npm, cache-dependency-path: web/package-lock.json }
       - run: npm ci
       - run: npm test
+      - uses: actions/upload-artifact@v4
+        with: { name: site, path: web/dist, retention-days: 7 }
+  deploy:
+    needs: test
+    # Secrets are not available to pull requests from forks.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: site, path: web/dist }
+      - name: Deploy to Cloudflare
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: web
+          # main goes live at kaasu.opensawce.com; pull requests get a preview version
+          command: ${{ github.event_name == 'push' && 'deploy' || 'versions upload' }}
