@@ -23,6 +23,7 @@ import (
 	"github.com/opensawce/kaasu/internal/obs"
 	"github.com/opensawce/kaasu/internal/orders"
 	"github.com/opensawce/kaasu/internal/pool"
+	"github.com/opensawce/kaasu/internal/review"
 	"github.com/opensawce/kaasu/internal/scheduler"
 	"github.com/opensawce/kaasu/internal/secrets"
 	"github.com/opensawce/kaasu/internal/server"
@@ -94,7 +95,8 @@ func New(cfg config.Config, key secrets.MasterKey, log *slog.Logger) (*App, erro
 	a.Jobs.Every("nonces.purge", 5*time.Minute)
 	a.Server = server.New(cfg, log)
 	// The merchant dashboard is on the admin listener only.
-	dash := &admin.Dashboard{Auth: a.Admin, DB: st.Read(), Lang: "en", Now: clk.Now}
+	dash := &admin.Dashboard{Auth: a.Admin, DB: st.Read(), Lang: "en", Now: clk.Now,
+		Review: review.New(st, clk, states.New(clk, pool.New(st, clk)))}
 	dashMux := http.NewServeMux()
 	dash.Register(dashMux)
 	a.Server.Mount("admin", "/admin/", dashMux)
