@@ -2,9 +2,16 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"database/sql"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/opensawce/kaasu/internal/clock"
+	"github.com/opensawce/kaasu/internal/ledger"
+	"github.com/opensawce/kaasu/internal/store"
 )
 
 func TestRun(t *testing.T) {
@@ -86,5 +93,45 @@ func TestKeygenAndRotateKey(t *testing.T) {
 	errb.Reset()
 	if code := run([]string{"rotate-key"}, getenv, &out, &errb); code != 0 || !strings.Contains(out.String(), "rotated 0 secrets") {
 		t.Errorf("rotate-key: code=%d out=%q err=%q", code, out.String(), errb.String())
+	}
+}
+
+func TestVerifyDetectsTampering(t *testing.T) {
+	db := filepath.Join(t.TempDir(), "k.db")
+	getenv := func(k string) string {
+		if k == "KAASU_DATABASE_PATH" {
+			return db
+		}
+		return ""
+	}
+	var out, errb bytes.Buffer
+	if code := run([]string{"verify"}, getenv, &out, &errb); code != 0 || !strings.Contains(out.String(), "ledger intact: 0 rows") {
+		t.Fatalf("fresh db: code=%d out=%q err=%q", code, out.String(), errb.String())
+	}
+	st, err := store.Open(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clk := clock.NewFake(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+	for i := 0; i < 3; i++ {
+		_ = st.Tx(context.Background(), func(tx *sql.Tx) error {
+			_, err := ledger.Append(context.Background(), tx, clk, ledger.Entry{Kind: "order.created", OrderID: "ord_1"})
+			return err
+		})
+	}
+	out.Reset()
+	if code := run([]string{"verify"}, getenv, &out, &errb); code != 0 || !strings.Contains(out.String(), "3 rows") {
+		t.Fatalf("clean ledger: code=%d out=%q", code, out.String())
+	}
+	_ = st.Tx(context.Background(), func(tx *sql.Tx) error {
+		_, _ = tx.Exec(`DROP TRIGGER ledger_no_update`)
+		_, err := tx.Exec(`UPDATE ledger SET actor='mallory' WHERE seq=2`)
+		return err
+	})
+	st.Close()
+	out.Reset()
+	code := run([]string{"verify"}, getenv, &out, &errb)
+	if code != 1 || !strings.Contains(out.String(), "BROKEN at row 2") {
+		t.Errorf("tampered: code=%d out=%q", code, out.String())
 	}
 }
