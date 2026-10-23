@@ -1,0 +1,11 @@
+---
+// Kaasu mark: gold coin with a square hole, on the green tile.
+interface Props { size?: number }
+const { size = 34 } = Astro.props;
+const id = `h${Math.random().toString(36).slice(2, 8)}`;
+---
+<svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
+  <defs><mask id={id}><rect width="48" height="48" fill="#fff"/><rect x="20" y="20" width="8" height="8" rx="1.5" fill="#000"/></mask></defs>
+  <rect width="48" height="48" rx="10.8" fill="#0F7B5F"/>
+  <g mask={`url(#${id})`}><circle cx="24" cy="24" r="15" fill="#E8A33D"/><circle cx="24" cy="24" r="11.2" fill="none" stroke="#B97A1E" stroke-width="1.6"/></g>
+</svg>

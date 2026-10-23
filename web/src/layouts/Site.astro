@@ -1,0 +1,74 @@
+---
+import '@fontsource-variable/bricolage-grotesque';
+import '@fontsource/ibm-plex-sans/400.css';
+import '@fontsource/ibm-plex-sans/600.css';
+import '@fontsource/ibm-plex-mono/400.css';
+import '../styles/tokens.css';
+import '../styles/site.css';
+import Mark from '../components/Mark.astro';
+
+interface Props { title: string; description: string }
+const { title, description } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const site = Astro.site?.toString().replace(/\/$/, '') ?? '';
+const og = `${site}${base}/img/social-preview.png`;
+const path = Astro.url.pathname;
+const nav = [
+  ['Docs', `${base}/docs/`],
+  ['Terms', `${base}/terms/`],
+  ['GitHub', 'https://github.com/opensawce/kaasu'],
+];
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{title}</title>
+  <meta name="description" content={description} />
+  <meta property="og:title" content={title} />
+  <meta property="og:description" content={description} />
+  <meta property="og:image" content={og} />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="nav">
+    <div class="wrap nav-in">
+      <a class="brand" href={`${base}/`}><Mark size={32} /><span>kaasu</span></a>
+      <nav aria-label="Main">
+        {nav.map(([label, href]) => <a href={href} aria-current={path.startsWith(href) && href !== `${base}/` ? 'page' : undefined}>{label}</a>)}
+      </nav>
+    </div>
+  </header>
+  <main id="main"><slot /></main>
+  <footer class="foot">
+    <div class="wrap foot-in">
+      <div>
+        <a class="brand" href={`${base}/`}><Mark size={28} /><span>kaasu</span></a>
+        <p>Confirm UPI payments without touching the money.</p>
+        <p class="small">Built by OpenSawce, Bengaluru.</p>
+      </div>
+      <div>
+        <h3>Learn</h3>
+        <a href={`${base}/docs/`}>Documentation</a>
+        <a href={`${base}/docs/start/install/`}>Install</a>
+        <a href={`${base}/docs/reference/security/`}>Security</a>
+      </div>
+      <div>
+        <h3>Project</h3>
+        <a href="https://github.com/opensawce/kaasu">GitHub</a>
+        <a href="https://github.com/opensawce/kaasu/issues">Roadmap and issues</a>
+        <a href="https://github.com/opensawce/kaasu/blob/main/CONTRIBUTING.md">Contributing</a>
+      </div>
+      <div>
+        <h3>Legal</h3>
+        <a href={`${base}/terms/`}>Terms</a>
+        <a href="https://github.com/opensawce/kaasu/blob/main/LICENSE">Licence</a>
+        <a href="https://github.com/opensawce/kaasu/blob/main/CLA.md">Contributor agreement</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

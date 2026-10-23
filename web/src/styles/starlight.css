@@ -1,0 +1,35 @@
+/* Map Kaasu tokens onto Starlight so docs match the rest of the site. */
+:root {
+  --sl-font: var(--font-body);
+  --sl-font-mono: var(--font-mono);
+  --sl-color-accent-low: var(--green-tint);
+  --sl-color-accent: var(--green);
+  --sl-color-accent-high: var(--green-deep);
+  --sl-color-bg: var(--paper);
+  --sl-color-bg-nav: var(--paper);
+  --sl-color-bg-sidebar: var(--paper);
+  --sl-color-hairline: var(--line);
+  --sl-color-text: var(--body);
+  --sl-color-white: var(--ink);
+  --sl-color-text-accent: var(--green-deep);
+  --sl-content-width: 46rem;
+}
+:root[data-theme='dark'] {
+  --sl-color-accent-low: #0b3a2d;
+  --sl-color-accent: var(--mint);
+  --sl-color-accent-high: #b7ecd9;
+  --sl-color-bg: #101614;
+  --sl-color-bg-nav: #101614;
+  --sl-color-bg-sidebar: #101614;
+  --sl-color-hairline: #2e3936;
+  --sl-color-text: #d6ddd9;
+  --sl-color-white: #ffffff;
+  --sl-color-text-accent: var(--mint);
+}
+h1, h2, h3, h4, .site-title {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+.site-title { font-weight: 800; font-size: 1.4rem; letter-spacing: -0.04em; text-transform: lowercase; }
+.sl-markdown-content :not(pre) > code { background: #ecebe6; color: var(--ink); border: 0; border-radius: 6px; }
+:root[data-theme='dark'] .sl-markdown-content :not(pre) > code { background: #1e2327; color: #e8ece9; }

@@ -1,0 +1,41 @@
+---
+import Site from '../layouts/Site.astro';
+import Paisu from '../components/Paisu.astro';
+const sections = [
+  ['what', 'What Kaasu is', 'Kaasu is free, open source software that helps a shop confirm UPI payments. It reads bank alerts you give it and marks orders paid or asks you to decide. It does not hold, move or process money.', 'Kaasu watches. Your bank moves the money.'],
+  ['licence', 'Licence', 'The code is released under the AGPL-3.0. You may use, study, change and share it under that licence. A separate commercial licence is available from OpenSawce for people who cannot meet the AGPL terms.', 'Free to use. Share changes if you offer it as a service.'],
+  ['you', 'Your responsibilities', 'You run your own copy, so you look after your server, your keys, your backups and your bank account. You decide which orders to accept, and you remain responsible for goods, tax and refunds.', 'Your shop, your call.'],
+  ['accuracy', 'Accuracy and delays', 'Kaasu depends on alerts from your bank and your devices. If an alert is late, missing or changed, a payment may show late or ask for your review. Check your bank before handing over high value goods.', 'When unsure, Kaasu asks you.'],
+  ['data', 'Your data', 'Kaasu stores data on your own machine. OpenSawce does not receive your orders, customers or alerts. If you turn on an optional service such as AI help, only the data you configure is sent to that provider.', 'Nothing leaves your machine unless you switch it on.'],
+  ['warranty', 'No warranty', 'The software is provided as is, without promises of fitness for a purpose. It is early software, so test with small amounts before you rely on it.', 'Start small.'],
+  ['liability', 'Limit of liability', 'To the extent the law allows, OpenSawce and contributors are not liable for lost sales, lost money, or indirect loss that comes from using Kaasu.', 'Use it with your own checks in place.'],
+  ['contribute', 'Contributing', 'If you contribute code you agree to the contributor agreement, and you follow the AI-assisted coding policy in the contributing guide.', 'Be kind, be honest about AI help.'],
+  ['changes', 'Changes and contact', 'We may update these terms as the project grows. The history is public on GitHub. Questions can go to the issue tracker, and security reports to the private advisory form.', 'Last updated: October 2026.'],
+] as const;
+---
+<Site title="Terms | Kaasu" description="Plain-language terms for using Kaasu, the open source UPI payment confirmation tool.">
+  <section class="terms-hero">
+    <div class="wrap terms-grid">
+      <div>
+        <div class="eyebrow">Terms</div>
+        <h1>Plain terms, no surprises</h1>
+        <p class="lead">Short, honest and written for shop owners. Each section has a one-line summary.</p>
+      </div>
+      <div style="display:flex;justify-content:center"><Paisu size={190} /></div>
+    </div>
+  </section>
+  <div class="wrap terms-body">
+    <nav class="toc" aria-label="Sections">
+      {sections.map(([id, t]) => <a href={`#${id}`}>{t}</a>)}
+    </nav>
+    <article>
+      {sections.map(([id, t, body, sum], i) => (
+        <section id={id}>
+          <h2>{i + 1}. {t}</h2>
+          <p>{body}</p>
+          <p class="summary"><b>In short:</b> {sum}</p>
+        </section>
+      ))}
+    </article>
+  </div>
+</Site>
