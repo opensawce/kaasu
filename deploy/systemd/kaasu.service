@@ -1,0 +1,33 @@
+[Unit]
+Description=Kaasu payment confirmation
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=kaasu
+Group=kaasu
+ExecStart=/usr/local/bin/kaasu serve
+Environment=KAASU_DATABASE_PATH=/var/lib/kaasu/kaasu.db
+LoadCredential=kaasu-master-key:/etc/kaasu/master.key
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/kaasu
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+SystemCallFilter=@system-service
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

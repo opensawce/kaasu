@@ -10,6 +10,7 @@ import (
 	"io"
 	"log/slog"
 	"math"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -60,6 +61,10 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		return rotateKey(getenv, stdout, stderr)
 	case "admin":
 		return admin(args[1:], getenv, stdout, stderr)
+	case "doctor":
+		return doctor(getenv, stdout, stderr)
+	case "healthcheck":
+		return healthcheck(getenv, stdout, stderr)
 	case "sim":
 		return simCmd(args[1:], stdout, stderr)
 	case "account":
@@ -186,6 +191,66 @@ func openApp(getenv func(string) string, stderr io.Writer, quiet bool) (*app.App
 		return nil, nil, false
 	}
 	return a, log, true
+}
+
+// doctor checks the things an install most often gets wrong. It exits 1 on any FAIL.
+func doctor(getenv func(string) string, stdout, stderr io.Writer) int {
+	code := 0
+	report := func(ok bool, name, detail string) {
+		word := "OK"
+		if !ok {
+			word = "FAIL"
+			code = 1
+		}
+		fmt.Fprintf(stdout, "%-4s %-16s %s\n", word, name, detail)
+	}
+	cfg, err := config.Load(getenv, getenv("KAASU_CONFIG"))
+	report(err == nil, "config", errText(err, "loaded"))
+	if err != nil {
+		return code
+	}
+	_, src, err := secrets.LoadMasterKey(getenv, secrets.MacKeychain)
+	report(err == nil, "master key", errText(err, "from "+src))
+	st, err := store.Open(cfg.DatabasePath)
+	report(err == nil, "database", errText(err, cfg.DatabasePath))
+	if err != nil {
+		return code
+	}
+	defer st.Close()
+	err = st.Migrate(context.Background())
+	report(err == nil, "migrations", errText(err, "up to date"))
+	res, err := ledger.Verify(context.Background(), st.Read())
+	report(err == nil && res.OK, "ledger", errText(err, res.Describe()))
+	return code
+}
+
+func errText(err error, ok string) string {
+	if err != nil {
+		return err.Error()
+	}
+	return ok
+}
+
+// healthcheck is what the container runs: the admin listener must answer /healthz.
+func healthcheck(getenv func(string) string, stdout, stderr io.Writer) int {
+	cfg, err := config.Load(getenv, getenv("KAASU_CONFIG"))
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	c := &http.Client{Timeout: 3 * time.Second}
+	resp, err := c.Get("http://" + cfg.AdminAddr + "/healthz")
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		fmt.Fprintln(stderr, "unhealthy:", resp.Status)
+		return 1
+	}
+	fmt.Fprintln(stdout, "ok")
+	return 0
 }
 
 // simCmd lists the payment scenarios. Running one needs a paired device; that is wired with dev mode.
