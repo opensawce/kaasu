@@ -44,3 +44,15 @@ Never report vulnerabilities in public issues. Use [GitHub Security Advisories](
 ## Be kind
 
 Assume good intent, review the code not the person, and help newcomers. Maintainers may moderate or lock threads that aren't.
+
+## Labels and milestones
+
+Each PR gets an `area:*` label from its changed files (`.github/labeler.yml`). Milestones: `M1 demo`, `M2 alerts`, `M3 surfaces`, `M4 launch`.
+
+## Branch names
+
+Stacked work uses `feat/<issue>-<slug>`, `fix/...`, `chore/...`, `web/...`. Each PR's base is the branch below it in the stack.
+
+## PR titles
+
+Titles must follow Conventional Commits (`feat(scope): subject`). The `pr-title` check enforces this.
