@@ -98,6 +98,7 @@ type alertRow struct {
 	utr, payer  string
 	occurred    string
 	accountHint string
+	parser      string
 }
 
 type candidate struct {
@@ -142,8 +143,8 @@ func (m *Matcher) ProcessTx(ctx context.Context, tx *sql.Tx, alertID string) err
 
 func loadAlert(ctx context.Context, tx *sql.Tx, id string) (alertRow, error) {
 	var a alertRow
-	err := tx.QueryRowContext(ctx, `SELECT amount_paise, COALESCE(utr,''), COALESCE(payer_masked,''), occurred_at, COALESCE(account_hint,'')
-		FROM alerts WHERE id = ?`, id).Scan(&a.amount, &a.utr, &a.payer, &a.occurred, &a.accountHint)
+	err := tx.QueryRowContext(ctx, `SELECT amount_paise, COALESCE(utr,''), COALESCE(payer_masked,''), occurred_at, COALESCE(account_hint,''), COALESCE(parser,'')
+		FROM alerts WHERE id = ?`, id).Scan(&a.amount, &a.utr, &a.payer, &a.occurred, &a.accountHint, &a.parser)
 	if err != nil {
 		return a, fmt.Errorf("load alert %s: %w", id, err)
 	}
@@ -193,6 +194,9 @@ func (m *Matcher) signals(ctx context.Context, tx *sql.Tx, alertID string, a ale
 	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM alert_sources s JOIN evidence e ON e.id = s.evidence_id
 		WHERE s.alert_id = ? AND e.source IN ('device','email'))`, alertID).Scan(&s.AuthenticSource); err != nil {
 		return s, err
+	}
+	if a.parser == "ai" {
+		s.AuthenticSource = false
 	}
 	var sources int
 	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM alert_sources WHERE alert_id = ?`, alertID).Scan(&sources); err != nil {
