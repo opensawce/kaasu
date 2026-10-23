@@ -22,6 +22,20 @@ Diagrams are drawn in Eraser. Source: `assets/diagrams/*.eraser` · Images: `ass
 ### Data model
 ![Data model](assets/diagrams/data-model.png)
 
+SQLite in WAL mode, STRICT tables, foreign keys on, one writer (`BEGIN IMMEDIATE`). Migrations are numbered files in `internal/store/migrations/`; never edit an applied one.
+
+| Table | Holds | Guarded by |
+|---|---|---|
+| `receiving_accounts` | UPI IDs the shop receives on | unique VPA |
+| `orders` | one row per order, state, exact paise | unique idempotency key, state check |
+| `amount_reservations` | the unique amount an open order holds | primary key (account, amount) |
+| `devices`, `nonces` | paired phones and replay protection | unique (device, nonce) |
+| `evidence`, `alerts` | raw alert bodies and parsed facts | unique raw hash, unique UTR |
+| `matches` | alert to order decisions | one match per alert |
+| `refunds` | refunds recorded against orders | foreign key to orders |
+| `ledger` | append-only hash chain | see ledger rules |
+| `outbox` | webhook events waiting for delivery | unique event id |
+
 ### Deployment
 | Option | Diagram |
 |---|---|
