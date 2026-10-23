@@ -103,3 +103,18 @@ func TestMountOnlyAppearsOnItsListener(t *testing.T) {
 		}
 	}
 }
+
+func TestSecurityHeadersOnEveryListener(t *testing.T) {
+	s := start(t)
+	a := s.Addrs()
+	for name, addr := range map[string]string{"public": a.Public, "ingest": a.Ingest, "admin": a.Admin} {
+		resp, err := http.Get("http://" + addr + "/healthz")
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.Header.Get("Content-Security-Policy") == "" || resp.Header.Get("X-Content-Type-Options") != "nosniff" {
+			t.Errorf("%s: security headers missing", name)
+		}
+	}
+}
