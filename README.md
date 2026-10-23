@@ -21,7 +21,8 @@
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
   <a href="#how-it-works">How it works</a> ·
-  <a href="design.md">Design spec</a> ·
+  <a href="design.md">Design</a> ·
+  <a href="architecture.md">Architecture</a> ·
   <a href="https://github.com/opensawce/kaasu/milestones">Roadmap</a> ·
   <a href="#contributing">Contributing</a>
 </p>
@@ -93,7 +94,8 @@ kaasu sim exact-match
 
 ## Docs
 
-- [`design.md`](design.md): product, brand, UI and system spec
+- [`design.md`](design.md): product, brand and UI spec
+- [`architecture.md`](architecture.md): system design, API, security
 - [`AGENTS.md`](AGENTS.md): rules for contributors and AI coding agents
 - [System design in Eraser](https://app.eraser.io/workspace/DGtR2KRhH2uuKnljVGsC): editable diagrams
 
