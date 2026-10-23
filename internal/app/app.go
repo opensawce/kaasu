@@ -15,9 +15,12 @@ import (
 	"github.com/opensawce/kaasu/internal/evidence"
 	"github.com/opensawce/kaasu/internal/id"
 	"github.com/opensawce/kaasu/internal/ingest"
+	"github.com/opensawce/kaasu/internal/match"
 	"github.com/opensawce/kaasu/internal/orders"
+	"github.com/opensawce/kaasu/internal/pool"
 	"github.com/opensawce/kaasu/internal/secrets"
 	"github.com/opensawce/kaasu/internal/server"
+	"github.com/opensawce/kaasu/internal/states"
 	"github.com/opensawce/kaasu/internal/store"
 )
 
@@ -59,6 +62,7 @@ func New(cfg config.Config, key secrets.MasterKey, log *slog.Logger) (*App, erro
 	// Ingest is served only on the ingest listener; admin and public never see /ingest/.
 	a.Server.Mount("ingest", "/ingest/", ingest.Handler(ingest.Deps{
 		Store: st, Clock: clk, Devices: a.Devices, Evidence: evidence.New(clk, ids),
+		Matcher: match.New(st, clk, states.New(clk, pool.New(st, clk))),
 	}))
 	a.Server.Mount("public", "/v1/", api.New(api.Deps{Orders: a.Orders, Vault: a.Vault}))
 	return a, nil
