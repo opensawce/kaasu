@@ -13,6 +13,7 @@ import (
 
 	"github.com/opensawce/kaasu/internal/config"
 	"github.com/opensawce/kaasu/internal/server"
+	"github.com/opensawce/kaasu/internal/store"
 )
 
 // version is set at build time with -ldflags "-X main.version=...".
@@ -35,13 +36,35 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		return 0
 	case "serve":
 		return serve(args[1:], getenv, stderr)
-	case "migrate", "verify", "backup", "pair":
+	case "migrate":
+		return migrate(getenv, stdout, stderr)
+	case "verify", "backup", "pair":
 		fmt.Fprintf(stderr, "kaasu %s: not implemented yet\n", args[0])
 		return 1
 	default:
 		fmt.Fprintf(stderr, "unknown command %q\n%s\n", args[0], usage)
 		return 2
 	}
+}
+
+func migrate(getenv func(string) string, stdout, stderr io.Writer) int {
+	cfg, err := config.Load(getenv, getenv("KAASU_CONFIG"))
+	if err != nil {
+		fmt.Fprintln(stderr, "config:", err)
+		return 1
+	}
+	st, err := store.Open(cfg.DatabasePath)
+	if err != nil {
+		fmt.Fprintln(stderr, "open database:", err)
+		return 1
+	}
+	defer st.Close()
+	if err := st.Migrate(context.Background()); err != nil {
+		fmt.Fprintln(stderr, "migrate:", err)
+		return 1
+	}
+	fmt.Fprintln(stdout, "schema up to date")
+	return 0
 }
 
 func serve(_ []string, getenv func(string) string, stderr io.Writer) int {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -34,5 +35,24 @@ func TestRun(t *testing.T) {
 				t.Errorf("stderr=%q want %q", errb.String(), tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestMigrateIsIdempotent(t *testing.T) {
+	db := filepath.Join(t.TempDir(), "k.db")
+	getenv := func(k string) string {
+		if k == "KAASU_DATABASE_PATH" {
+			return db
+		}
+		return ""
+	}
+	for i := 0; i < 2; i++ {
+		var out, errb bytes.Buffer
+		if code := run([]string{"migrate"}, getenv, &out, &errb); code != 0 {
+			t.Fatalf("run %d: code=%d stderr=%q", i, code, errb.String())
+		}
+		if !strings.Contains(out.String(), "schema up to date") {
+			t.Errorf("run %d: stdout=%q", i, out.String())
+		}
 	}
 }
