@@ -2,7 +2,9 @@ package orders
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -155,3 +157,75 @@ func TestOrderLifecycleIsLedgered(t *testing.T) {
 }
 
 func ledgerActor(ctx context.Context, a string) context.Context { return ledger.WithActor(ctx, a) }
+
+func TestPoolFullQueuesOrder(t *testing.T) {
+	e := setup(t)
+	for i := range 100 {
+		o, _, err := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900}, fmt.Sprintf("p%d", i))
+		if err != nil || o.State != "awaiting" || o.AmountPaise != 49900+int64(i) {
+			t.Fatalf("order %d: %+v err=%v", i, o, err)
+		}
+	}
+	q, created, err := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900}, "p100")
+	if err != nil || !created {
+		t.Fatalf("err=%v created=%v", err, created)
+	}
+	if q.State != "queued" || q.AmountPaise != 49900 {
+		t.Errorf("101st order must be queued at the base amount, got %+v", q)
+	}
+	var kind string
+	if err := e.svc.st.Read().QueryRow(`SELECT kind FROM ledger WHERE order_id = ?`, q.ID).Scan(&kind); err != nil || kind != "order.queued" {
+		t.Errorf("ledger kind=%q err=%v", kind, err)
+	}
+}
+
+func TestCancelPromotesNextQueued(t *testing.T) {
+	e := setup(t)
+	first, _, _ := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900}, "p0")
+	for i := 1; i < 100; i++ {
+		_, _, _ = e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900}, fmt.Sprintf("p%d", i))
+	}
+	q, _, _ := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900}, "pq")
+	if q.State != "queued" {
+		t.Fatalf("setup: want queued, got %s", q.State)
+	}
+	if _, err := e.svc.Cancel(e.ctx, first.ID); err != nil {
+		t.Fatal(err)
+	}
+	got, err := e.svc.Get(e.ctx, q.ID)
+	if err != nil || got.State != "awaiting" || got.AmountPaise != 49900 {
+		t.Fatalf("queued order should be promoted into the freed slot: %+v err=%v", got, err)
+	}
+	if !strings.Contains(got.UPILink, "am=499.00") {
+		t.Errorf("promoted order must show its reserved paise in the link: %s", got.UPILink)
+	}
+}
+
+func TestCustomerAmountShowsExactPaise(t *testing.T) {
+	e := setup(t)
+	a, _, _ := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49907}, "a")
+	b, _, _ := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49907}, "b")
+	if b.AmountPaise != 49908 {
+		t.Fatalf("second order should take base+1, got %d", b.AmountPaise)
+	}
+	if !strings.Contains(a.UPILink, "am=499.07") || !strings.Contains(b.UPILink, "am=499.08") {
+		t.Errorf("links: %s / %s", a.UPILink, b.UPILink)
+	}
+}
+
+func TestPoolFailureRollsBackOrder(t *testing.T) {
+	e := setup(t)
+	if err := e.svc.st.Tx(e.ctx, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(e.ctx, `CREATE TRIGGER no_hold BEFORE INSERT ON amount_reservations BEGIN SELECT RAISE(ABORT, 'boom'); END`)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900}, "k"); err == nil {
+		t.Fatal("a failed reservation must fail the request")
+	}
+	var n int
+	if err := e.svc.st.Read().QueryRow(`SELECT count(*) FROM orders`).Scan(&n); err != nil || n != 0 {
+		t.Errorf("no order may survive a failed reservation: n=%d err=%v", n, err)
+	}
+}

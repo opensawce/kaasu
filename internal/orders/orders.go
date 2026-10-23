@@ -15,6 +15,7 @@ import (
 	"github.com/opensawce/kaasu/internal/accounts"
 	"github.com/opensawce/kaasu/internal/clock"
 	"github.com/opensawce/kaasu/internal/ledger"
+	"github.com/opensawce/kaasu/internal/pool"
 	"github.com/opensawce/kaasu/internal/store"
 	"github.com/opensawce/kaasu/internal/upi"
 )
@@ -67,10 +68,11 @@ type Service struct {
 	clk  clock.Clock
 	ids  IDSource
 	accs *accounts.Service
+	pool *pool.Pool
 }
 
 func New(st *store.Store, clk clock.Clock, ids IDSource, accs *accounts.Service) *Service {
-	return &Service{st: st, clk: clk, ids: ids, accs: accs}
+	return &Service{st: st, clk: clk, ids: ids, accs: accs, pool: pool.New(st, clk)}
 }
 
 func invalid(format string, a ...any) error {
@@ -155,12 +157,12 @@ func (s *Service) Create(ctx context.Context, in CreateInput, idemKey string) (O
 		return Order{}, false, err
 	}
 	now := s.clk.Now().UTC()
+	expires := now.Add(in.ExpiresIn)
 	o := Order{
-		ID: s.ids.New("ord"), AccountID: acc.ID, State: "awaiting", BaseAmountPaise: in.AmountPaise, AmountPaise: in.AmountPaise,
+		ID: s.ids.New("ord"), AccountID: acc.ID, State: "created", BaseAmountPaise: in.AmountPaise, AmountPaise: in.AmountPaise,
 		Currency: "INR", Reference: in.Reference, Note: in.Note,
-		ExpiresAt: now.Add(in.ExpiresIn).Format(time.RFC3339), CreatedAt: now.Format(time.RFC3339), UpdatedAt: now.Format(time.RFC3339),
+		ExpiresAt: expires.Format(time.RFC3339), CreatedAt: now.Format(time.RFC3339), UpdatedAt: now.Format(time.RFC3339),
 	}
-	o.UPILink = upi.Link(acc.VPA, acc.DisplayName, o.AmountPaise, o.Note)
 	err = s.st.Tx(ctx, func(tx *sql.Tx) error {
 		// Re-check inside the writer so two concurrent requests with one key cannot both insert.
 		var n int
@@ -170,11 +172,29 @@ func (s *Service) Create(ctx context.Context, in CreateInput, idemKey string) (O
 		if n > 0 {
 			return errRace
 		}
+		// The row goes in first so the pool's reservation can reference it; its final state is set below in this same tx.
 		if _, err := tx.ExecContext(ctx, `INSERT INTO orders(id,account_id,base_amount_paise,amount_paise,state,reference,note,idempotency_key,request_hash,expires_at,created_at,updated_at)
 			VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, o.ID, o.AccountID, o.BaseAmountPaise, o.AmountPaise, o.State, nullable(o.Reference), nullable(o.Note), idemKey, hash, o.ExpiresAt, o.CreatedAt, o.UpdatedAt); err != nil {
 			return err
 		}
-		_, err := ledger.Append(ctx, tx, s.clk, ledger.Entry{Kind: "order.created", OrderID: o.ID,
+		amt, err := s.pool.Reserve(ctx, tx, acc.ID, o.ID, in.AmountPaise, expires)
+		switch {
+		case errors.Is(err, pool.ErrPoolFull):
+			o.State = "queued"
+			if _, err := tx.ExecContext(ctx, `UPDATE orders SET state = 'queued', queued_at = ? WHERE id = ?`, o.CreatedAt, o.ID); err != nil {
+				return err
+			}
+			_, err = ledger.Append(ctx, tx, s.clk, ledger.Entry{Kind: "order.queued", OrderID: o.ID,
+				Payload: map[string]any{"amount_paise": o.AmountPaise, "account_id": o.AccountID}})
+			return err
+		case err != nil:
+			return err
+		}
+		o.State, o.AmountPaise = "awaiting", amt
+		if _, err := tx.ExecContext(ctx, `UPDATE orders SET state = 'awaiting', amount_paise = ? WHERE id = ?`, amt, o.ID); err != nil {
+			return err
+		}
+		_, err = ledger.Append(ctx, tx, s.clk, ledger.Entry{Kind: "order.created", OrderID: o.ID,
 			Payload: map[string]any{"amount_paise": o.AmountPaise, "account_id": o.AccountID, "reference": o.Reference}})
 		return err
 	})
@@ -184,6 +204,7 @@ func (s *Service) Create(ctx context.Context, in CreateInput, idemKey string) (O
 	if err != nil {
 		return Order{}, false, err
 	}
+	o.UPILink = upi.Link(acc.VPA, acc.DisplayName, o.AmountPaise, o.Note)
 	return o, true, nil
 }
 
@@ -233,11 +254,21 @@ func (s *Service) Cancel(ctx context.Context, id string) (Order, error) {
 		default:
 			return ErrNotCancellable
 		}
+		var accountID string
+		if err := tx.QueryRowContext(ctx, `SELECT account_id FROM orders WHERE id = ?`, id).Scan(&accountID); err != nil {
+			return err
+		}
 		now := s.clk.Now().UTC().Format(time.RFC3339)
 		if _, err := tx.ExecContext(ctx, `UPDATE orders SET state='cancelled', updated_at=? WHERE id=?`, now, id); err != nil {
 			return err
 		}
-		_, err := ledger.Append(ctx, tx, s.clk, ledger.Entry{Kind: "order.cancelled", OrderID: id, Payload: map[string]any{"from": state}})
+		if _, err := ledger.Append(ctx, tx, s.clk, ledger.Entry{Kind: "order.cancelled", OrderID: id, Payload: map[string]any{"from": state}}); err != nil {
+			return err
+		}
+		if err := s.pool.Release(ctx, tx, id); err != nil {
+			return err
+		}
+		_, err := s.pool.PromoteQueued(ctx, tx, accountID)
 		return err
 	})
 	if err != nil {
