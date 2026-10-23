@@ -296,3 +296,37 @@ func (s *Service) Sweep(ctx context.Context) error {
 	}
 	return nil
 }
+
+// ExpireDue moves every awaiting or queued order whose expiry has passed to expired. Called by the scheduler.
+// An order expires exactly at expires_at. Its slot is kept until the grace window ends.
+func (s *Service) ExpireDue(ctx context.Context) (int, error) {
+	now := s.clk.Now().UTC().Format(time.RFC3339)
+	var ids []string
+	rows, err := s.st.Read().QueryContext(ctx, `SELECT id FROM orders WHERE state IN ('awaiting','queued') AND expires_at <= ?`, now)
+	if err != nil {
+		return 0, err
+	}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Close(); err != nil {
+		return 0, err
+	}
+	expired := 0
+	for _, id := range ids {
+		err := s.st.Tx(ctx, func(tx *sql.Tx) error {
+			_, err := s.sm.Transition(ctx, tx, id, "expired", map[string]any{"reason": "expiry"})
+			return err
+		})
+		if err != nil {
+			return expired, fmt.Errorf("expire %s: %w", id, err)
+		}
+		expired++
+	}
+	return expired, nil
+}
