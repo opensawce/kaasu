@@ -1,0 +1,6 @@
+{
+  "secret": "whsec_test_example",
+  "timestamp": 1767261600,
+  "body": "{\"event_id\":\"evt_example\",\"type\":\"order.confirmed\",\"data\":{\"order\":{\"id\":\"ord_1\",\"state\":\"confirmed\",\"amount_paise\":49907}}}",
+  "header": "t=1767261600,v1=3d73b6f91ee65b605640f38529f6c04516f4f58cdbbcd73cb248c251d6df4445"
+}

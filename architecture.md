@@ -59,6 +59,8 @@ Headers: `X-Kaasu-Device`, `X-Kaasu-Timestamp`, `X-Kaasu-Nonce` (16 to 64 charac
 
 **Payment links and counter QR (issue #25, partial).** A payment link has a fixed amount and an optional expiry; each visit creates or reuses an order through the same orders service as the API, keyed by link, visitor and amount, so a refresh reuses the order. A counter link has no amount: the shop types it (`ParseCounterAmount`: at least ₹1, at most ₹1,00,000, integer paise). Disabled and expired links answer as gone. `WhatsAppURL` builds the share link, and `Standee` is the printable A6 sign that loads nothing from outside.
 
+**Checkout snippet (issue #26, partial).** `kaasu.js` (under 3 KB, no dependencies, no inline handlers) opens the pay page by redirect or in a popup, and reports status from the pay page only when the message comes from that page's origin. `examples/webhooks/vectors.json` holds one signed delivery; the Go receiver example verifies it, and the other languages must do the same.
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 
