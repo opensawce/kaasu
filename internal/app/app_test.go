@@ -102,3 +102,36 @@ func TestIngestOnlyOnIngestListener(t *testing.T) {
 		t.Errorf("ingest listener should reply 401 to an unsigned request, got %d", r.StatusCode)
 	}
 }
+
+func TestDashboardOnlyOnAdminListener(t *testing.T) {
+	cfg := config.Config{PublicAddr: "127.0.0.1:0", IngestAddr: "127.0.0.1:0", AdminAddr: "127.0.0.1:0", DatabasePath: filepath.Join(t.TempDir(), "k.db"), LogLevel: "info"}
+	a, err := New(cfg, make([]byte, 32), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		c, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = a.Shutdown(c)
+	})
+	addrs := a.Server.Addrs()
+	r, err := http.Get("http://" + addrs.Admin + "/admin/login")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Body.Close()
+	if r.StatusCode != 200 {
+		t.Errorf("admin sign-in page: %d", r.StatusCode)
+	}
+	p, err := http.Get("http://" + addrs.Public + "/admin/login")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Body.Close()
+	if p.StatusCode != 404 {
+		t.Errorf("public must not serve the dashboard: %d", p.StatusCode)
+	}
+}
