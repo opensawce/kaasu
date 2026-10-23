@@ -3,7 +3,7 @@ import starlight from '@astrojs/starlight';
 
 // SITE_URL and BASE_PATH are set by CI. Locally the site is served from "/".
 export default defineConfig({
-  site: process.env.SITE_URL ?? 'https://opensawce.github.io',
+  site: process.env.SITE_URL ?? 'https://kaasu.opensawce.com',
   base: process.env.BASE_PATH ?? '/',
   integrations: [
     starlight({
@@ -14,6 +14,14 @@ export default defineConfig({
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/opensawce/kaasu' }],
       editLink: { baseUrl: 'https://github.com/opensawce/kaasu/edit/main/web/' },
       lastUpdated: true,
+      head: [
+        { tag: 'meta', attrs: { property: 'og:image', content: 'https://kaasu.opensawce.com/img/social-preview.png' } },
+        { tag: 'meta', attrs: { property: 'og:site_name', content: 'Kaasu' } },
+        { tag: 'meta', attrs: { property: 'og:locale', content: 'en_IN' } },
+        { tag: 'meta', attrs: { name: 'twitter:image', content: 'https://kaasu.opensawce.com/img/social-preview.png' } },
+        { tag: 'meta', attrs: { name: 'theme-color', content: '#0F7B5F' } },
+        { tag: 'link', attrs: { rel: 'alternate', type: 'text/plain', href: '/llms.txt', title: 'LLM summary' } },
+      ],
       customCss: [
         '@fontsource-variable/bricolage-grotesque',
         '@fontsource/ibm-plex-sans/400.css',

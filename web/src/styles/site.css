@@ -193,3 +193,11 @@ section { padding: 88px 0; }
 @keyframes swipe { to { background-size: 100% 100%; } }
 @keyframes draw { to { stroke-dashoffset: 0; } }
 @media (prefers-reduced-motion: reduce) { .h-hero .mark { animation: none; background-size: 100% 100%; } .h-hero .squig path { animation: none; stroke-dashoffset: 0; } }
+
+.faq { max-width: 48rem; display: grid; gap: 10px; }
+.faq details { border: 1px solid var(--line); border-radius: 14px; background: var(--paper); transition: background .2s, border-color .2s; }
+.faq details[open] { background: #fff; border-color: var(--green); }
+.faq summary { list-style: none; cursor: pointer; padding: 18px 20px; font: 700 1.05rem var(--font-display); color: var(--ink); display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary svg { flex: none; transition: transform .25s; color: var(--green-deep); } .faq details[open] summary svg { transform: rotate(90deg); }
+.faq details p { padding: 0 20px 18px; }

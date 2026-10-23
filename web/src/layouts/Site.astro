@@ -7,12 +7,13 @@ import '../styles/tokens.css';
 import '../styles/site.css';
 import Mark from '../components/Mark.astro';
 
-interface Props { title: string; description: string }
-const { title, description } = Astro.props;
+interface Props { title: string; description: string; jsonLd?: object[]; noindex?: boolean }
+const { title, description, jsonLd = [], noindex = false } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const site = Astro.site?.toString().replace(/\/$/, '') ?? '';
 const og = `${site}${base}/img/social-preview.png`;
 const path = Astro.url.pathname;
+const canonical = new URL(path, Astro.site ?? 'https://kaasu.opensawce.com').toString();
 const nav = [
   ['Docs', `${base}/docs/`],
   ['Terms', `${base}/terms/`],
@@ -26,10 +27,24 @@ const nav = [
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{title}</title>
   <meta name="description" content={description} />
+  <link rel="canonical" href={canonical} />
+  <meta name="robots" content={noindex ? 'noindex' : 'index, follow, max-image-preview:large, max-snippet:-1'} />
+  <meta name="theme-color" content="#0F7B5F" />
+  <meta name="author" content="OpenSawce" />
+  <link rel="sitemap" href={`${base}/sitemap-index.xml`} />
+  <link rel="alternate" type="text/plain" href={`${base}/llms.txt`} title="LLM summary" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Kaasu" />
+  <meta property="og:locale" content="en_IN" />
+  <meta property="og:url" content={canonical} />
+  <meta property="og:image:width" content="1280" />
+  <meta property="og:image:height" content="640" />
+  <meta property="og:image:alt" content="Kaasu: confirm UPI payments without touching the money" />
   <meta property="og:title" content={title} />
   <meta property="og:description" content={description} />
   <meta property="og:image" content={og} />
   <meta name="twitter:card" content="summary_large_image" />
+  {jsonLd.map((d) => <script type="application/ld+json" set:html={JSON.stringify({ '@context': 'https://schema.org', ...d })} />)}
   <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
 </head>
 <body>
