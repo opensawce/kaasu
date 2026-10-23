@@ -1,6 +1,6 @@
 ---
 title: API
-description: REST API basics.
+description: Kaasu REST API basics, including the base path, API keys, idempotency and paise amounts.
 ---
 
 - Base path `/v1`.
