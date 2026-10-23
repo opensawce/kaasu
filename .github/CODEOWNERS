@@ -1,17 +1,17 @@
 # Money path: needs a code owner and a second approval (see AGENTS.md)
-/internal/match/      @manish-9245 @AdiKulkarni21
-/internal/parsers/    @manish-9245 @AdiKulkarni21
-/internal/states/     @manish-9245 @AdiKulkarni21
-/internal/ledger/     @manish-9245 @AdiKulkarni21
-/internal/auth/       @manish-9245 @AdiKulkarni21
-/internal/evidence/   @manish-9245 @AdiKulkarni21
-/internal/secrets/    @manish-9245 @AdiKulkarni21
+/internal/match/      @manish-9245 @AdiKulkarni21 @scoder5
+/internal/parsers/    @manish-9245 @AdiKulkarni21 @scoder5
+/internal/states/     @manish-9245 @AdiKulkarni21 @scoder5
+/internal/ledger/     @manish-9245 @AdiKulkarni21 @scoder5
+/internal/auth/       @manish-9245 @AdiKulkarni21 @scoder5
+/internal/evidence/   @manish-9245 @AdiKulkarni21 @scoder5
+/internal/secrets/    @manish-9245 @AdiKulkarni21 @scoder5
 
 # Security policy, rules and CI
-/SECURITY.md          @manish-9245 @AdiKulkarni21
-/AGENTS.md            @manish-9245 @AdiKulkarni21
-/CONTRIBUTING.md      @manish-9245 @AdiKulkarni21
-/.github/             @manish-9245 @AdiKulkarni21
+/SECURITY.md          @manish-9245 @AdiKulkarni21 @scoder5
+/AGENTS.md            @manish-9245 @AdiKulkarni21 @scoder5
+/CONTRIBUTING.md      @manish-9245 @AdiKulkarni21 @scoder5
+/.github/             @manish-9245 @AdiKulkarni21 @scoder5
 
 # Everything else
-*                     @manish-9245
+*                     @manish-9245 @scoder5
