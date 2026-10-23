@@ -57,6 +57,8 @@ Headers: `X-Kaasu-Device`, `X-Kaasu-Timestamp`, `X-Kaasu-Nonce` (16 to 64 charac
 
 **Payment confirmed page (issue #24).** `/pay/{id}/done` shows the success screen only when the order is confirmed or late-paid; anything else redirects back to the pay page, and the URL can never make success appear. It shows the amount from the order (a `?amount=` query is ignored), a live "time since confirmed" counter, the UTR, time, reference and a six-character check code. The code is an HMAC of the order, the confirmation time and the amount, so the shopkeeper can compare it. `/pay/{id}/receipt` is the printable receipt (`?format=txt` for plain text). The tick animation respects reduced motion. Paisu never appears on customer pages.
 
+**Payment links and counter QR (issue #25, partial).** A payment link has a fixed amount and an optional expiry; each visit creates or reuses an order through the same orders service as the API, keyed by link, visitor and amount, so a refresh reuses the order. A counter link has no amount: the shop types it (`ParseCounterAmount`: at least ₹1, at most ₹1,00,000, integer paise). Disabled and expired links answer as gone. `WhatsAppURL` builds the share link, and `Standee` is the printable A6 sign that loads nothing from outside.
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 
