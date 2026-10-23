@@ -183,3 +183,13 @@ section { padding: 88px 0; }
   .reveal, .lrow, .term .ln { opacity: 1; transform: none; transition: none; animation: none !important; }
   .btn, .card, .stat, .shots img { transition: none; } .btn:hover, .card:hover, .stat:hover, .shots figure:hover img { transform: none; }
 }
+
+/* hero headline: three voices instead of one */
+.h-hero .mark { background: linear-gradient(transparent 62%, rgba(232,163,61,.55) 62% 92%, transparent 92%) no-repeat 0 0 / 0% 100%; animation: swipe .7s .5s cubic-bezier(.2,.7,.3,1) forwards; padding: 0 .06em; }
+.h-hero .soft { font-weight: 400; font-style: italic; color: var(--grey); letter-spacing: -.02em; }
+.h-hero .accent { color: var(--green); position: relative; display: inline-block; }
+.h-hero .squig { position: absolute; left: 0; right: 0; bottom: -.14em; width: 100%; height: .22em; overflow: visible; }
+.h-hero .squig path { stroke-dasharray: 340; stroke-dashoffset: 340; animation: draw .9s 1s ease forwards; }
+@keyframes swipe { to { background-size: 100% 100%; } }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .h-hero .mark { animation: none; background-size: 100% 100%; } .h-hero .squig path { animation: none; stroke-dashoffset: 0; } }
