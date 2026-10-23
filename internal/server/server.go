@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/opensawce/kaasu/internal/config"
+	"github.com/opensawce/kaasu/internal/httpx"
 )
 
 // Addrs are the bound listener addresses (useful when configured with port 0).
@@ -92,7 +93,7 @@ func (s *Server) Start() error {
 			return fmt.Errorf("listen %s on %s: %w", sp.name, sp.addr, err)
 		}
 		srv := &http.Server{
-			Handler:           sp.h,
+			Handler:           s.protect(sp.h),
 			ReadHeaderTimeout: 10 * time.Second,
 			ReadTimeout:       30 * time.Second,
 			WriteTimeout:      30 * time.Second,
@@ -111,6 +112,11 @@ func (s *Server) Start() error {
 		}(l)
 	}
 	return nil
+}
+
+// protect wraps every listener in the same baseline: headers, panic recovery, a request time limit and a body cap.
+func (s *Server) protect(h http.Handler) http.Handler {
+	return httpx.Secure(httpx.Recover(s.log)(httpx.Timeout(15*time.Second)(httpx.MaxBody(64<<10)(h))), false)
 }
 
 func (s *Server) closeListeners() {

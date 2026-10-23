@@ -43,6 +43,8 @@ Headers: `X-Kaasu-Device`, `X-Kaasu-Timestamp`, `X-Kaasu-Nonce` (16 to 64 charac
 
 **Admin sign-in (issue #12, partial).** Admin sign-in is TOTP (RFC 6238, SHA-1, 30 s, 6 digits, one step of skew, each code works once) with sessions stored only as hashes. Sessions last 12 hours absolute and 30 minutes idle. Five failures lock a name for five minutes; unknown names and wrong codes get the same reply. Sensitive actions need a code within the last five minutes (`RequireFresh`, `Reauth`). Staff are read-only (`RequireOwner`). Forms carry a CSRF token derived from the session. Passkeys are the intended primary method and are not built yet.
 
+**HTTP baseline (issue #13).** Every listener wears the same protections: a strict Content-Security-Policy (`default-src 'self'`, no inline script), `nosniff`, `no-referrer`, `frame-ancestors 'none'`, HSTS only over TLS, a 15-second request limit, a 64 KB body cap, and panic recovery that returns a plain 500 with no stack. Rate limiting is a token bucket per key; client identity ignores forwarded headers unless a trusted proxy is configured.
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 
