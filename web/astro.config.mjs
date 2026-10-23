@@ -3,7 +3,7 @@ import starlight from '@astrojs/starlight';
 
 // SITE_URL and BASE_PATH are set by CI. Locally the site is served from "/".
 export default defineConfig({
-  site: process.env.SITE_URL ?? 'https://opensawce.github.io',
+  site: process.env.SITE_URL ?? 'https://kaasu.opensawce.com',
   base: process.env.BASE_PATH ?? '/',
   integrations: [
     starlight({
