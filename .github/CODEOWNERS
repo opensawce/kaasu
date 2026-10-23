@@ -13,5 +13,9 @@
 /CONTRIBUTING.md      @manish-9245 @AdiKulkarni21 @scoder5
 /.github/             @manish-9245 @AdiKulkarni21 @scoder5
 
+# Website dependency bumps: no owner, so a bot approval is enough once checks pass
+/web/package.json
+/web/package-lock.json
+
 # Everything else
 *                     @manish-9245 @scoder5
