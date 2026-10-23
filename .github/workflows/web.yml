@@ -39,5 +39,5 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: '4'
           workingDirectory: web
-          # main goes live at kaasu.opensawce.com; pull requests get a preview version
-          command: ${{ github.event_name == 'push' && 'deploy' || 'versions upload' }}
+          # main goes live at kaasu.opensawce.com; pull requests only validate the upload (no preview yet)
+          command: ${{ github.event_name == 'push' && 'deploy' || 'deploy --dry-run' }}
