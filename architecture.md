@@ -35,6 +35,8 @@ Headers: `X-Kaasu-Device`, `X-Kaasu-Timestamp`, `X-Kaasu-Nonce` (16 to 64 charac
 
 **Scheduler (issue #10).** Time-based work is rows in the `jobs` table, so a restart resumes pending work. Retries wait 10 s, 30 s, 2 min, 10 min, then 1 h, and a job is `dead` after 8 attempts. A job is claimed with a 5-minute lock in a short transaction, runs outside any transaction, and panics are recorded as failures. Recurring jobs are stored in `recurring`. Built-in jobs: `orders.expire` (every 5 s; expires an order exactly at `expires_at`), `pool.sweep` (every minute; promotes queued orders once grace has ended) and `nonces.purge` (every 5 minutes).
 
+**Signed webhooks (issue #11).** Every change that matters to a shop writes an outbox row in the same transaction as the change: `order.confirmed`, `order.review`, `order.rejected`, `order.expired`, `order.cancelled`, `order.refunded`, `order.disputed`. The payload carries the order id, state, amount, reference and account, never payer data. Delivery is at least once with header `X-Kaasu-Signature: t=<unix>,v1=<hex HMAC-SHA256(secret, t "." body)>` and `X-Kaasu-Event-Id`. Retries wait 10 s, 30 s, 2 min, 10 min, 1 h, 6 h, 12 h, 24 h, then the event is dead-lettered. Targets must be https and must not resolve to loopback, private or link-local addresses; the guard checks the address actually dialled, and redirects are refused. Receivers verify with `webhooks.Verify` and dedupe by `event_id`.
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 

@@ -274,3 +274,61 @@ func TestExpireDueAtExactExpiry(t *testing.T) {
 		t.Errorf("state=%s", got.State)
 	}
 }
+
+func TestExpireDueAlsoExpiresQueued(t *testing.T) {
+	e := setup(t)
+	for i := 0; i < 100; i++ {
+		_, _, _ = e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900}, fmt.Sprintf("eq%d", i))
+	}
+	q, _, _ := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900, ExpiresIn: time.Minute}, "eqq")
+	if q.State != "queued" {
+		t.Fatalf("setup: %s", q.State)
+	}
+	e.clk.Advance(2 * time.Minute)
+	if n, err := e.svc.ExpireDue(e.ctx); err != nil || n < 1 {
+		t.Fatalf("n=%d err=%v", n, err)
+	}
+	got, _ := e.svc.Get(e.ctx, q.ID)
+	if got.State != "expired" {
+		t.Errorf("queued order past expiry: state=%s", got.State)
+	}
+}
+
+func TestSweepWithNoAccountsIsNoop(t *testing.T) {
+	st := testutil.OpenStore(t)
+	clk := clock.NewFake(time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC))
+	ids := &testutil.Seq{}
+	svc := New(st, clk, ids, accounts.New(st, clk, ids))
+	if err := svc.Sweep(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := svc.ExpireDue(context.Background()); err != nil || n != 0 {
+		t.Fatalf("n=%d err=%v", n, err)
+	}
+}
+
+func TestGetUnknownOrder(t *testing.T) {
+	e := setup(t)
+	if _, err := e.svc.Get(e.ctx, "ord_missing"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("want ErrNotFound, got %v", err)
+	}
+}
+
+func TestSweepPromotesPerAccount(t *testing.T) {
+	e := setup(t)
+	acc2, _ := e.svc.accs.Create(e.ctx, accounts.Input{VPA: "second@okicici", Bank: "ICICI", DisplayName: "Second"})
+	for i := 0; i < 100; i++ {
+		_, _, _ = e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900, AccountID: acc2.ID}, fmt.Sprintf("sw%d", i))
+	}
+	q, _, _ := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900, AccountID: acc2.ID, ExpiresIn: 60 * time.Minute}, "swq")
+	if q.State != "queued" {
+		t.Fatalf("setup: %s", q.State)
+	}
+	// Sweep must not promote while the held slots are still inside their window.
+	if err := e.svc.Sweep(e.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := e.svc.Get(e.ctx, q.ID); got.State != "queued" {
+		t.Errorf("held slots must keep the queued order waiting, state=%s", got.State)
+	}
+}

@@ -25,6 +25,7 @@ import (
 	"github.com/opensawce/kaasu/internal/server"
 	"github.com/opensawce/kaasu/internal/states"
 	"github.com/opensawce/kaasu/internal/store"
+	"github.com/opensawce/kaasu/internal/webhooks"
 )
 
 type randomIDs struct{}
@@ -75,6 +76,12 @@ func New(cfg config.Config, key secrets.MasterKey, log *slog.Logger) (*App, erro
 			return err
 		})
 	})
+	hooks := webhooks.New(st, clk, a.Vault, false, log)
+	a.Jobs.Register("webhooks.deliver", func(ctx context.Context, _ scheduler.Job) error {
+		_, err := hooks.Deliver(ctx)
+		return err
+	})
+	a.Jobs.Every("webhooks.deliver", 5*time.Second)
 	a.Jobs.Every("orders.expire", 5*time.Second)
 	a.Jobs.Every("pool.sweep", time.Minute)
 	a.Jobs.Every("nonces.purge", 5*time.Minute)
