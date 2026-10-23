@@ -27,7 +27,7 @@ Closes #
 - [ ] No new dependency, or reason given below
 - [ ] UI: screenshots on phone + desktop, every state, one Indic script checked
 - [ ] New text added to the string catalogue (no hard-coded strings)
-- [ ] `design.md` / `AGENTS.md` updated if rules or behaviour changed
+- [ ] `design.md` / `architecture.md` / `AGENTS.md` updated if UI, system or rules changed
 - [ ] I have signed the CLA
 
 ## Screenshots / notes

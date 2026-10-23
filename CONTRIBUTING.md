@@ -7,12 +7,12 @@ Thanks for helping. Kaasu handles people's money, so we keep a high bar and a si
 - **Code:** pick an [issue](https://github.com/opensawce/kaasu/issues). Each has a brief and an end state.
 - **New bank formats:** report an alert format we don't parse yet with the *Bank alert format* issue template. Redact it first.
 - **Translations:** native speakers reviewing strings in any of our 11 languages.
-- **Docs and design:** see [`design.md`](design.md).
+- **Docs and design:** see [`design.md`](design.md) for UI and [`architecture.md`](architecture.md) for the system.
 
 ## Workflow
 
 1. Comment on the issue to claim it, so work isn't duplicated.
-2. Read [`AGENTS.md`](AGENTS.md) for conventions and hard rules, and [`design.md`](design.md) for the spec.
+2. Read [`AGENTS.md`](AGENTS.md) for conventions and hard rules, and the specs: [`design.md`](design.md) (UI) and [`architecture.md`](architecture.md) (system).
 3. Branch from `main`. Use [Conventional Commits](https://www.conventionalcommits.org) (`feat:`, `fix:`, `docs:`…).
 4. Add tests, and a simulator scenario if behaviour changes. `make lint test` must pass offline.
 5. Open a PR with the template filled in. One issue per PR, with `Closes #n`.

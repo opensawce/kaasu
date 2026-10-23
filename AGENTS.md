@@ -1,6 +1,6 @@
 # AGENTS.md (Kaasu)
 
-Kaasu confirms UPI payments for small Indian shops. Money moves customer bank → merchant bank; Kaasu never touches it. It watches signed bank alerts and marks orders paid. Full spec: `design.md`.
+Kaasu confirms UPI payments for small Indian shops. Money moves customer bank → merchant bank; Kaasu never touches it. It watches signed bank alerts and marks orders paid. Specs: `design.md` (product, brand, UI) and `architecture.md` (system, API, security).
 
 ## Commands
 
@@ -55,7 +55,7 @@ assets/             logo, Paisu, icons, tokens.json (SVG is source; WebP generat
 - **Text:** every string in `i18n/`; no hard-coded copy; amounts with Indian grouping; UPI/UTR/IDs stay Latin.
 - **Paisu:** merchant screens only; `happy` only after confirmation.
 - **Fixtures:** bank alert samples must be redacted.
-- **Diagrams:** edit `assets/diagrams/<name>.eraser`, paste into the Eraser file, re-export `<name>.png` at 2×, all in the same PR. Never hand-edit the PNG.
+- **Diagrams:** edit `assets/diagrams/<name>.eraser`, paste into the Eraser file, re-export `<name>.png` at 2× with a white background, all in the same PR. Never hand-edit the PNG.
 - **Git:** Conventional Commits; one issue per PR; `Closes #n`.
 
 ## AI-assisted coding
@@ -66,5 +66,5 @@ Follow the [AI-assisted coding policy](CONTRIBUTING.md#ai-assisted-coding-policy
 
 - Tests + a simulator scenario for any behaviour change
 - `make lint test` passes offline
-- `design.md` updated if behaviour or rules changed
+- `design.md` updated if UI changed; `architecture.md` updated if system, API or security changed
 - UI changes: phone + desktop screenshots, every state, one Indic script checked
