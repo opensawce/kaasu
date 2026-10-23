@@ -342,9 +342,18 @@ func TestTerminalFreesSlotAndPromotes(t *testing.T) {
 	if got := stateOf(t, e, "q_1"); got != "queued" {
 		t.Fatalf("rejected order's amount stays held inside grace, queued order state=%s", got)
 	}
-	// Only a refund frees the amount at once.
-	if _, err := tr(e, "f_000", "refunded", nil); err == nil {
-		t.Fatal("rejected is terminal; refunded must be illegal from it")
+	// Only a refund frees the amount at once. f_001 is confirmed then refunded.
+	if _, err := tr(e, "f_001", "review", nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tr(e, "f_001", "confirmed", nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tr(e, "f_001", "refunded", nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := stateOf(t, e, "q_1"); got != "awaiting" {
+		t.Fatalf("refund should free a slot and promote the queued order, state=%s", got)
 	}
 }
 
