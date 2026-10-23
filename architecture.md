@@ -67,6 +67,8 @@ Headers: `X-Kaasu-Device`, `X-Kaasu-Timestamp`, `X-Kaasu-Nonce` (16 to 64 charac
 
 **Review queue (issue #31).** Held payments wait in `internal/review`. The queue shows the expected amount next to what the bank said, the score breakdown and reason, and the raw alert (escaped on display). Confirm moves the order to confirmed, or to late-paid if its window has passed; reject needs one reason from a fixed list. Both write the owner's name into the ledger. On the admin listener a decision needs the owner role, a valid CSRF token and a fresh sign-in (five minutes); staff get 403. A second decision on the same order is refused.
 
+**Paisu moods (issue #34, rules only).** `paisu.Choose` picks one of five moods for merchant screens, by priority: worried (broken ledger or dead webhook), asleep (no live source), needs-ok (a held payment), happy (only right after a confirmation), otherwise waiting. Customer pages never show Paisu. The artwork and the template partial are not in this change.
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 
