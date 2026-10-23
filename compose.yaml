@@ -1,0 +1,21 @@
+services:
+  kaasu:
+    build: .
+    restart: unless-stopped
+    environment:
+      KAASU_PUBLIC_ADDR: ":8080"
+      KAASU_INGEST_ADDR: ":8443"
+      KAASU_ADMIN_ADDR: "127.0.0.1:9000"
+      CREDENTIALS_DIRECTORY: /run/secrets
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    volumes:
+      - kaasu-data:/data
+    secrets:
+      - kaasu-master-key
+secrets:
+  kaasu-master-key:
+    file: ./secrets/master.key
+volumes:
+  kaasu-data:

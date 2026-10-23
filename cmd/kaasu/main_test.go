@@ -170,3 +170,19 @@ func TestAdminInitPrintsEnrollmentOnce(t *testing.T) {
 		t.Error("creating the same admin twice must fail")
 	}
 }
+
+func TestDoctorFailsWithoutKeyAndPassesWithOne(t *testing.T) {
+	var out, errb bytes.Buffer
+	envs := map[string]string{"KAASU_DATABASE_PATH": filepath.Join(t.TempDir(), "d.db")}
+	getenv := func(k string) string { return envs[k] }
+	if code := run([]string{"doctor"}, getenv, &out, &errb); code != 1 || !strings.Contains(out.String(), "FAIL master key") {
+		t.Errorf("no key should FAIL: code=%d out=%q", code, out.String())
+	}
+	var kb bytes.Buffer
+	run([]string{"keygen"}, func(string) string { return "" }, &kb, &bytes.Buffer{})
+	envs["KAASU_MASTER_KEY"] = strings.TrimSpace(kb.String())
+	out.Reset()
+	if code := run([]string{"doctor"}, getenv, &out, &errb); code != 0 || strings.Contains(out.String(), "FAIL") {
+		t.Errorf("healthy install: code=%d out=%q", code, out.String())
+	}
+}
