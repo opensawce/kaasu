@@ -27,6 +27,11 @@ type Store struct {
 
 func dsn(path, extra string) string {
 	q := url.Values{}
+	if extra == "readonly" {
+		// The read pool refuses writes at the connection, not just by convention.
+		q.Add("_pragma", "query_only(1)")
+		extra = ""
+	}
 	q.Add("_pragma", "journal_mode(WAL)")
 	q.Add("_pragma", "foreign_keys(1)")
 	q.Add("_pragma", "busy_timeout(5000)")
