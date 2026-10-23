@@ -1,0 +1,89 @@
+openapi: 3.1.0
+info:
+  title: Kaasu API
+  version: 0.1.0
+  description: |
+    Create orders and read their state. All money is an integer number of paise (49907 means ₹499.07).
+    Send your API key as `Authorization: Bearer kaasu_live_...`. Creating an order needs an `Idempotency-Key` header;
+    repeating a request with the same key and body returns the first order, and a different body returns 422.
+servers:
+  - url: http://localhost:8080
+security:
+  - bearer: []
+paths:
+  /v1/orders:
+    post:
+      summary: Create an order
+      operationId: createOrder
+      parameters:
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateOrder' }
+      responses:
+        '201': { description: Order created, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '200': { description: Replay of an earlier request with the same key and body }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '422': { description: Idempotency-Key reused with a different body }
+  /v1/orders/{id}:
+    get:
+      summary: Get an order
+      operationId: getOrder
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The order, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+  /v1/orders/{id}/cancel:
+    post:
+      summary: Cancel an unpaid order
+      operationId: cancelOrder
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The cancelled order }
+        '409': { description: The order can no longer be cancelled }
+components:
+  securitySchemes:
+    bearer: { type: http, scheme: bearer }
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: object
+                properties: { code: { type: string }, message: { type: string } }
+  schemas:
+    CreateOrder:
+      type: object
+      additionalProperties: false
+      required: [amount_paise]
+      properties:
+        amount_paise: { type: integer, minimum: 100, maximum: 10000000 }
+        account_id: { type: string, description: Required when the shop has more than one receiving account }
+        reference: { type: string }
+        note: { type: string, description: Shown in the customer's UPI app (first 50 characters) }
+        expires_in_seconds: { type: integer, minimum: 60, maximum: 86400, default: 900 }
+    Order:
+      type: object
+      properties:
+        id: { type: string }
+        account_id: { type: string }
+        state: { type: string, enum: [created, queued, awaiting, matched, confirmed, review, rejected, cancelled, expired, late_paid, refunded, disputed] }
+        base_amount_paise: { type: integer }
+        amount_paise: { type: integer, description: The exact amount the customer pays }
+        currency: { type: string, enum: [INR] }
+        reference: { type: string }
+        note: { type: string }
+        upi_link: { type: string }
+        expires_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        confirmed_at: { type: string, format: date-time }
