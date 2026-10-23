@@ -58,24 +58,37 @@ const langs = [
           <a class="btn btn-ghost" href="https://github.com/opensawce/kaasu"><Icon name="star" size={18} /> Star on GitHub</a>
         </div>
       </div>
-      <img class="hero-shot" src={img('hero.png')} width="1800" height="830" alt="Kaasu on a phone, a laptop and the customer pay page" />
+      <div class="demo" id="demo" data-state="waiting">
+        <div class="demo-paisu"><Paisu size={96} /></div>
+        <div class="demo-head"><span class="demo-title">Order #1042</span><span class="pill warn" id="demo-pill"><Icon name="alert" size={14} stroke={2.5} /> <span>Waiting</span></span></div>
+        <div class="demo-amt">₹499.07</div>
+        <ol class="demo-steps" aria-live="polite">
+          <li><span class="tick"><Icon name="check" size={14} stroke={3} /></span> Bank alert received</li>
+          <li><span class="tick"><Icon name="check" size={14} stroke={3} /></span> Signature verified</li>
+          <li><span class="tick"><Icon name="check" size={14} stroke={3} /></span> Matched to this order</li>
+        </ol>
+        <button class="btn btn-ghost demo-btn" id="demo-btn" type="button"><span>Pretend the customer paid</span></button>
+        <div class="hint">Try it. Paisu follows your cursor too.</div>
+      </div>
     </div>
   </section>
+
+  <div class="wrap band reveal"><img class="hero-shot" src={img('hero.png')} width="1800" height="830" alt="Kaasu on a phone, a laptop and the customer pay page" /></div>
 
   <section class="strip" aria-label="Why Kaasu">
     <div class="wrap strip-grid">
       {impact.map(([i, t, d]) => (
-        <div class="stat"><div class="ico"><Icon name={i} /></div><h3>{t}</h3><p>{d}</p></div>
+        <div class="reveal stat"><div class="ico"><Icon name={i} /></div><h3>{t}</h3><p>{d}</p></div>
       ))}
     </div>
   </section>
 
   <section id="how" style="background:#fff;border-block:1px solid var(--line)">
     <div class="wrap">
-      <div class="sec-head"><div class="eyebrow">How it works</div><h2>Three steps. No middleman.</h2></div>
+      <div class="sec-head reveal"><div class="eyebrow">How it works</div><h2>Three steps. No middleman.</h2></div>
       <div class="grid3">
         {steps.map(([i, t, d], n) => (
-          <div class="card"><div class="step-n">0{n + 1}</div><div class="ico"><Icon name={i} /></div><h3>{t}</h3><p>{d}</p></div>
+          <div class="reveal card"><div class="step-n">0{n + 1}</div><div class="ico"><Icon name={i} /></div><h3>{t}</h3><p>{d}</p></div>
         ))}
       </div>
     </div>
@@ -83,10 +96,10 @@ const langs = [
 
   <section>
     <div class="wrap">
-      <div class="sec-head"><div class="eyebrow">What you get</div><h2>Built for a busy counter</h2><p>Everything a small shop needs to trust a payment, and nothing it has to pay for.</p></div>
+      <div class="sec-head reveal"><div class="eyebrow">What you get</div><h2>Built for a busy counter</h2><p>Everything a small shop needs to trust a payment, and nothing it has to pay for.</p></div>
       <div class="grid3">
         {features.map(([i, t, d]) => (
-          <div class="card"><div class="ico gold"><Icon name={i} /></div><h3>{t}</h3><p>{d}</p></div>
+          <div class="reveal card"><div class="ico gold"><Icon name={i} /></div><h3>{t}</h3><p>{d}</p></div>
         ))}
       </div>
     </div>
@@ -94,10 +107,10 @@ const langs = [
 
   <section style="background:#fff;border-block:1px solid var(--line)">
     <div class="wrap">
-      <div class="sec-head"><div class="eyebrow">Screens</div><h2>Simple on every device</h2></div>
+      <div class="sec-head reveal"><div class="eyebrow">Screens</div><h2>Simple on every device</h2></div>
       <div class="shots phones">
         {screens.map(([f, t, d]) => (
-          <figure><img src={img(f)} width="780" height="1688" alt={`${t} screen`} loading="lazy" /><figcaption><b>{t}</b>{d}</figcaption></figure>
+          <figure class="reveal"><img src={img(f)} width="780" height="1688" alt={`${t} screen`} loading="lazy" /><figcaption><b>{t}</b>{d}</figcaption></figure>
         ))}
       </div>
       <div class="shots" style="margin-top:36px">
@@ -113,17 +126,18 @@ const langs = [
         <h2>A trail you can check</h2>
         <p class="lead">Every payment decision is written once and chained to the last. Run one check and see whether anything was altered.</p>
       </div>
-      <div class="ledger" role="group" aria-label="Example ledger">
+      <div class="ledger reveal" role="group" aria-label="Example ledger">
         <h3><Icon name="ledger" /> Ledger, last 4 events</h3>
         {ledger.map(([id, amt, s]) => (
-          <div class="lrow">
+          <div class="lrow" style={`--i:${ledger.findIndex(r => r[0] === id)}`}>
             <code>{id}</code><span class="amt">{amt}</span>
             {s === 'ok'
               ? <span class="pill ok"><Icon name="check" size={14} stroke={2.5} /> Confirmed</span>
               : <span class="pill warn"><Icon name="alert" size={14} stroke={2.5} /> Needs OK</span>}
           </div>
         ))}
-        <div class="verify"><Icon name="shield" /> Ledger intact · 1,247 entries <small>Checked just now</small></div>
+        <div class="verify" id="verify"><Icon name="shield" /> <span id="verify-text">Ledger intact · 1,247 entries</span> <small id="verify-when">Checked just now</small></div>
+        <button class="btn btn-ghost sm" id="verify-btn" type="button"><Icon name="ledger" size={16} /> Verify again</button>
       </div>
     </div>
   </section>
@@ -150,25 +164,25 @@ const langs = [
         <p class="lead">Start with demo data, send yourself a pretend bank alert, and watch an order turn green. Nothing leaves your computer.</p>
         <div class="row" style="margin-top:26px"><a class="btn btn-light" href={`${base}/docs/start/install/`}>Read the install guide</a></div>
       </div>
-      <pre class="term" aria-label="Install commands"><span class="c"># Start everything offline</span>
-<span class="p">$ </span>git clone https://github.com/opensawce/kaasu
-<span class="p">$ </span>cd kaasu &amp;&amp; make dev
-<span class="c"># Send a pretend signed bank alert</span>
-<span class="p">$ </span>kaasu sim exact-match
-<span class="ok">Order #1042 confirmed</span></pre>
+      <pre class="term" id="term" aria-label="Install commands"><span class="ln c" style="--i:0"># Start everything offline</span>
+<span class="ln" style="--i:1"><span class="p">$ </span>git clone https://github.com/opensawce/kaasu</span>
+<span class="ln" style="--i:2"><span class="p">$ </span>cd kaasu &amp;&amp; make dev</span>
+<span class="ln c" style="--i:3"># Send a pretend signed bank alert</span>
+<span class="ln" style="--i:4"><span class="p">$ </span>kaasu sim exact-match</span>
+<span class="ln ok" style="--i:5">Order #1042 confirmed</span></pre>
     </div>
   </section>
 
   <section>
     <div class="wrap">
-      <div class="sec-head"><div class="eyebrow">Honest limits</div><h2>What it is, and what it is not</h2></div>
+      <div class="sec-head reveal"><div class="eyebrow">Honest limits</div><h2>What it is, and what it is not</h2></div>
       <div class="limits">
-        <div class="card yes"><h3>What it does</h3><ul>
+        <div class="reveal card yes"><h3>What it does</h3><ul>
           <li><Icon name="checkCircle" size={20} /> Confirms payments from verified bank alerts</li>
           <li><Icon name="checkCircle" size={20} /> Keeps a checkable record of every decision</li>
           <li><Icon name="checkCircle" size={20} /> Asks you when it is not sure</li>
         </ul></div>
-        <div class="card no"><h3>What it is not</h3><ul>
+        <div class="reveal card no"><h3>What it is not</h3><ul>
           <li><Icon name="alert" size={20} /> Not a payment gateway. It never holds money</li>
           <li><Icon name="alert" size={20} /> Not instant if your bank sends alerts late</li>
           <li><Icon name="alert" size={20} /> Early software. Read the docs before real sales</li>
@@ -189,3 +203,80 @@ const langs = [
     </div>
   </section>
 </Site>
+
+<script>
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const $ = (id: string) => document.getElementById(id)!;
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, reduce ? 0 : ms));
+
+  // Scroll reveal, staggered by sibling order
+  const io = new IntersectionObserver((es) => es.forEach((e) => {
+    if (!e.isIntersecting) return;
+    const el = e.target as HTMLElement;
+    const sibs = [...(el.parentElement?.children ?? [])].filter((c) => c.classList.contains('reveal'));
+    el.style.transitionDelay = `${Math.min(sibs.indexOf(el), 5) * 70}ms`;
+    el.classList.add('in'); io.unobserve(el);
+    setTimeout(() => { el.style.transitionDelay = ''; }, 1200);
+  }), { threshold: 0.15 });
+  document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
+  const tio = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); tio.unobserve(e.target); } }), { threshold: 0.4 });
+  tio.observe($('term'));
+
+  // Nav shadow once scrolled
+  const nav = document.querySelector('.nav')!;
+  addEventListener('scroll', () => nav.classList.toggle('scrolled', scrollY > 8), { passive: true });
+
+  // Coin burst from an element
+  const burst = (from: Element) => {
+    if (reduce) return;
+    const r = from.getBoundingClientRect();
+    for (let i = 0; i < 14; i++) {
+      const c = document.createElement('span');
+      c.className = 'coin';
+      c.style.left = `${r.left + r.width / 2}px`; c.style.top = `${r.top + r.height / 3}px`;
+      document.body.append(c);
+      const a = (Math.PI * 2 * i) / 14, d = 70 + Math.random() * 70;
+      c.animate([
+        { transform: 'translate(0,0) scale(.4)', opacity: 1 },
+        { transform: `translate(${Math.cos(a) * d}px, ${Math.sin(a) * d - 40}px) scale(1)`, opacity: 1, offset: .6 },
+        { transform: `translate(${Math.cos(a) * d}px, ${Math.sin(a) * d + 60}px) scale(.8)`, opacity: 0 },
+      ], { duration: 900 + Math.random() * 300, easing: 'cubic-bezier(.2,.7,.3,1)' }).onfinish = () => c.remove();
+    }
+  };
+  document.addEventListener('paisu:burst', (e) => burst(e.target as Element));
+
+  // Hero demo: a pretend payment confirms step by step
+  const demo = $('demo'), btn = $('demo-btn') as HTMLButtonElement, pill = $('demo-pill');
+  const steps = [...demo.querySelectorAll('.demo-steps li')];
+  const setPill = (ok: boolean) => {
+    pill.className = `pill ${ok ? 'ok' : 'warn'}`;
+    pill.lastElementChild!.textContent = ok ? 'Confirmed' : 'Waiting';
+    pill.firstElementChild!.innerHTML = ok ? '<path d="M5 12l5 5 9-10"/>' : '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>';
+  };
+  let running = false;
+  btn.addEventListener('click', async () => {
+    if (running) return;
+    if (demo.dataset.state === 'confirmed') {
+      steps.forEach((s) => s.classList.remove('done')); setPill(false);
+      demo.dataset.state = 'waiting'; btn.firstElementChild!.textContent = 'Pretend the customer paid'; return;
+    }
+    running = true; btn.disabled = true; btn.firstElementChild!.textContent = 'Checking the bank alert';
+    for (const s of steps) { await wait(550); s.classList.add('done'); }
+    await wait(350);
+    setPill(true); demo.dataset.state = 'confirmed';
+    document.dispatchEvent(new Event('paisu:cheer')); burst(demo.querySelector('.demo-paisu')!);
+    btn.firstElementChild!.textContent = 'Reset the demo'; btn.disabled = false; running = false;
+  });
+
+  // Ledger: re-verify walks the rows
+  const rows = [...document.querySelectorAll('.lrow')], vb = $('verify-btn') as HTMLButtonElement;
+  vb.addEventListener('click', async () => {
+    vb.disabled = true; $('verify-text').textContent = 'Checking the chain';
+    rows.forEach((r) => r.classList.remove('checked'));
+    for (const r of rows) { await wait(380); r.classList.add('checked'); }
+    await wait(300);
+    $('verify-text').textContent = 'Ledger intact · 1,247 entries'; $('verify-when').textContent = 'Checked just now';
+    $('verify').classList.add('flash'); setTimeout(() => $('verify').classList.remove('flash'), 800);
+    vb.disabled = false;
+  });
+</script>

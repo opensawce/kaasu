@@ -3,7 +3,7 @@
 interface Props { size?: number; label?: string }
 const { size = 200, label = 'Paisu, the Kaasu coin mascot, waving hello' } = Astro.props;
 ---
-<svg class="paisu" viewBox="0 0 200 210" width={size} height={size * 1.05} role="img" aria-label={label}>
+<svg class="paisu" data-mood="idle" viewBox="0 0 200 210" width={size} height={size * 1.05} role="img" aria-label={label}>
   <ellipse class="p-shadow" cx="100" cy="200" rx="44" ry="6" fill="#14171A" opacity="0.14"/>
   <g class="p-bob">
     <path d="M86 160 V182 M114 160 V182" stroke="#14171A" stroke-width="6" stroke-linecap="round" fill="none"/>
@@ -18,18 +18,43 @@ const { size = 200, label = 'Paisu, the Kaasu coin mascot, waving hello' } = Ast
     <path d="M58 72 A48 48 0 0 1 84 50" stroke="#FFF4DC" stroke-width="6" stroke-linecap="round" fill="none"/>
     <ellipse cx="68" cy="114" rx="8" ry="5" fill="#E36F47" opacity="0.45"/>
     <ellipse cx="132" cy="114" rx="8" ry="5" fill="#E36F47" opacity="0.45"/>
-    <g class="p-blink">
+    <g class="p-blink"><g class="p-look">
       <ellipse cx="82" cy="94" rx="7" ry="10" fill="#14171A"/>
       <ellipse cx="118" cy="94" rx="7" ry="10" fill="#14171A"/>
       <circle cx="85" cy="90" r="2.5" fill="#fff"/>
       <circle cx="121" cy="90" r="2.5" fill="#fff"/>
-    </g>
-    <path d="M80 116 Q100 142 120 116 Z" fill="#14171A"/>
-    <path d="M90 128 Q100 136 110 128" fill="#E36F47"/>
+    </g></g>
+    <g class="p-mouth"><path d="M80 116 Q100 142 120 116 Z" fill="#14171A"/>
+    <path d="M90 128 Q100 136 110 128" fill="#E36F47"/></g>
   </g>
   <path class="p-spark" d="M24 26 V42 M16 34 H32" stroke="#0F7B5F" stroke-width="4" stroke-linecap="round" fill="none"/>
   <path class="p-spark p-spark-b" d="M184 112 V124 M178 118 H190" stroke="#0F7B5F" stroke-width="4" stroke-linecap="round" fill="none"/>
 </svg>
+<script>
+  // Paisu follows the pointer, and cheers when clicked or when the page asks (paisu:cheer).
+  const all = () => document.querySelectorAll<SVGElement>('.paisu');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const cheer = (el: Element) => {
+    el.setAttribute('data-mood', 'happy');
+    setTimeout(() => el.setAttribute('data-mood', 'idle'), 1400);
+  };
+  if (!reduce) {
+    addEventListener('pointermove', (e) => {
+      all().forEach((el) => {
+        const r = el.getBoundingClientRect();
+        const dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+        const d = Math.hypot(dx, dy) || 1, k = Math.min(1, d / 200) * 5;
+        el.style.setProperty('--lx', String((dx / d) * k));
+        el.style.setProperty('--ly', String((dy / d) * k));
+      });
+    }, { passive: true });
+  }
+  all().forEach((el) => {
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', () => { cheer(el); el.dispatchEvent(new CustomEvent('paisu:burst', { bubbles: true })); });
+  });
+  addEventListener('paisu:cheer', () => all().forEach(cheer));
+</script>
 <style>
   .p-bob { animation: p-bob 1.6s ease-in-out infinite; transform-origin: 100px 190px; }
   .p-shadow { animation: p-shadow 1.6s ease-in-out infinite; transform-origin: 100px 200px; }
@@ -37,13 +62,21 @@ const { size = 200, label = 'Paisu, the Kaasu coin mascot, waving hello' } = Ast
   .p-spark { animation: p-spark 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
   .p-spark-b { animation-delay: 0.8s; }
   .p-blink { animation: p-blink 4s infinite; transform-box: fill-box; transform-origin: center; }
+  .p-look { transform: translate(calc(var(--lx, 0) * 1px), calc(var(--ly, 0) * 1px)); transition: transform .12s ease-out; }
+  .p-mouth { transform-box: fill-box; transform-origin: center top; transition: transform .2s; }
+  .paisu:hover .p-wave { animation-duration: .35s; }
+  .paisu[data-mood='happy'] .p-bob { animation: p-jump .45s ease-out 3; }
+  .paisu[data-mood='happy'] .p-mouth { transform: scale(1.18); }
+  .paisu[data-mood='happy'] .p-spark { animation-duration: .5s; }
+  @keyframes p-jump { 0%, 100% { transform: translateY(0) scale(1, 1); } 40% { transform: translateY(-26px) scale(.97, 1.04); } 85% { transform: translateY(0) scale(1.05, .94); } }
   @keyframes p-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
   @keyframes p-shadow { 0%, 100% { transform: scale(1); opacity: 0.14; } 50% { transform: scale(0.8); opacity: 0.07; } }
   @keyframes p-wave { from { transform: rotate(-14deg); } to { transform: rotate(20deg); } }
   @keyframes p-spark { 0%, 100% { opacity: 0; transform: scale(0.4); } 50% { opacity: 1; transform: scale(1); } }
   @keyframes p-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.15); } }
   @media (prefers-reduced-motion: reduce) {
-    .p-bob, .p-shadow, .p-wave, .p-spark, .p-blink { animation: none; }
+    .p-bob, .p-shadow, .p-wave, .p-spark, .p-blink, .paisu[data-mood='happy'] .p-bob { animation: none; }
+    .p-look { transition: none; }
     .p-spark { opacity: 1; }
   }
 </style>
