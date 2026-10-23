@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/opensawce/kaasu/internal/clock"
-	"github.com/opensawce/kaasu/internal/ledger"
 	"github.com/opensawce/kaasu/internal/store"
 )
 
@@ -118,7 +117,9 @@ func (p *Pool) queuedOrders(ctx context.Context, tx *sql.Tx, accountID string, n
 	return waiting, nil
 }
 
-// PromoteQueued gives free slots to queued orders on the account, oldest first. Expired queued orders are skipped.
+// PromoteQueued gives free slots to queued orders on the account, oldest first, and returns their ids.
+// It sets amount_paise only; the caller moves each order to awaiting through states.Transition.
+// A queued order waits past its original expires_at: its window restarts at promotion.
 func (p *Pool) PromoteQueued(ctx context.Context, tx *sql.Tx, accountID string) ([]string, error) {
 	now := p.clk.Now()
 	waiting, err := p.queuedOrders(ctx, tx, accountID, now)
@@ -135,13 +136,8 @@ func (p *Pool) PromoteQueued(ctx context.Context, tx *sql.Tx, accountID string) 
 		if err != nil {
 			return promoted, err
 		}
-		if _, err := tx.ExecContext(ctx, `UPDATE orders SET amount_paise = ?, state = 'awaiting', queued_at = NULL, updated_at = ? WHERE id = ?`,
-			amt, ts(now), q.id); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE orders SET amount_paise = ?, queued_at = NULL WHERE id = ?`, amt, q.id); err != nil {
 			return promoted, fmt.Errorf("pool: promote: %w", err)
-		}
-		if _, err := ledger.Append(ctx, tx, p.clk, ledger.Entry{Kind: "order.promoted", OrderID: q.id,
-			Payload: map[string]any{"amount_paise": amt}}); err != nil {
-			return promoted, err
 		}
 		promoted = append(promoted, q.id)
 	}
