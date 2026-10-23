@@ -1,0 +1,76 @@
+title Kaasu: System architecture (self-hosted, single Go binary)
+direction right
+colorMode bold
+styleMode shadow
+typeface clean
+
+Customer [icon: smartphone, color: "#5B6168", label: "Customer UPI app"]
+Bank [icon: credit-card, color: "#5B6168", label: "Merchant's bank"]
+
+Alert sources [icon: radio, color: "#E8A33D"] {
+  Android Forwarder [icon: android, color: "#E8A33D", label: "SMS + app alerts"]
+  Mac agent [icon: apple, color: "#E8A33D", label: "Mac Messages"]
+  Bank inbox [icon: mail, color: "#E8A33D", label: "Bank email"]
+}
+
+Kaasu server [icon: server, color: "#0F7B5F", label: "Kaasu server (Go)"] {
+  Entry [icon: shield, color: "#3FC59A"] {
+    Public listener [icon: globe, color: "#3FC59A", label: "Public :443"]
+    Ingest listener [icon: lock, color: "#E8A33D", label: "Ingest :8443"]
+  }
+  Confirm pipeline [icon: cpu, color: "#0F7B5F"] {
+    Orders [icon: shopping-bag, color: "#0F7B5F", label: "Orders"]
+    Amount pool [icon: hash, color: "#0F7B5F", label: "Amount pool"]
+    Evidence [icon: inbox, color: "#0F7B5F", label: "Evidence + dedupe"]
+    Parsers [icon: file-text, color: "#0F7B5F", label: "Parsers"]
+    Matcher [icon: check-circle, color: "#0F7B5F", label: "Matcher"]
+  }
+  Outputs [icon: send, color: "#3FC59A"] {
+    Ledger [icon: link, color: "#14171A", label: "Ledger"]
+    Webhooks [icon: send, color: "#3FC59A", label: "Webhooks"]
+    Voice [icon: volume-2, color: "#E8A33D", label: "Voice alerts"]
+  }
+  Merchant admin [icon: key, color: "#9A5410"] {
+    Admin listener [icon: key, color: "#14171A", label: "Admin (VPN)"]
+    Review queue [icon: alert-circle, color: "#9A5410", label: "Review queue"]
+    Reconcile [icon: columns, color: "#9A5410", label: "Reconcile"]
+    Refunds [icon: rotate-ccw, color: "#9A5410", label: "Refund log"]
+  }
+  Background [icon: clock, color: "#5B6168"] {
+    Scheduler [icon: clock, color: "#5B6168", label: "Scheduler"]
+    Metrics [icon: activity, color: "#5B6168", label: "Logs + metrics"]
+  }
+  Storage [icon: database, color: "#14171A"] {
+    SQLite [icon: database, color: "#14171A", label: "SQLite"]
+    Secrets [icon: key, color: "#B42318", label: "Secrets"]
+  }
+}
+
+Shop backend [icon: shopping-cart, color: "#14171A", label: "Shop backend"]
+Merchant [icon: user, color: "#14171A", label: "Merchant"]
+Backups [icon: archive, color: "#5B6168", label: "Encrypted backups"]
+
+Customer > Public listener: pay page
+Customer > Bank: pays
+Bank > Alert sources: alert
+Alert sources > Ingest listener: signed
+Public listener > Orders
+Orders > Amount pool: reserve
+Ingest listener > Evidence
+Evidence > Parsers
+Parsers > Matcher
+Orders > Matcher
+Matcher > Ledger: confirmed
+Matcher > Review queue: held
+Ledger > Webhooks
+Ledger > Voice
+Webhooks > Shop backend
+Voice > Merchant
+Merchant > Admin listener
+Admin listener > Review queue
+Admin listener > Reconcile
+Admin listener > Refunds
+Scheduler > Amount pool: expire, release
+Scheduler > Webhooks: retry
+Ledger > SQLite
+SQLite > Backups

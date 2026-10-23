@@ -1,0 +1,33 @@
+title Kaasu: Payment confirmation flow
+colorMode bold
+styleMode shadow
+typeface clean
+
+Customer [icon: smartphone, color: "#5B6168"]
+Shop backend [icon: shopping-cart, color: "#14171A"]
+Kaasu [icon: server, color: "#0F7B5F"]
+Merchant [icon: user, color: "#14171A"]
+Android Forwarder [icon: android, color: "#E8A33D"]
+Merchant bank [icon: credit-card, color: "#5B6168"]
+
+Shop backend > Kaasu: Create order (idempotent)
+Kaasu > Kaasu: Reserve ₹499.07 or queue
+Kaasu > Shop backend: Pay link
+Customer > Kaasu: Open pay page
+Customer > Merchant bank: Pay ₹499.07 (UPI)
+Merchant bank > Android Forwarder: SMS / app alert
+Android Forwarder > Kaasu: Signed alert
+Kaasu > Kaasu: Verify, dedupe, score
+alt [label: Auto-confirm, color: "#0F7B5F", icon: check-circle] {
+  Kaasu > Kaasu: Ledger + outbox
+  Kaasu > Shop backend: Webhook (retried till 2xx)
+  Kaasu > Merchant: Voice: ₹499 received
+  Kaasu > Customer: Confirmed (live)
+}
+else [label: Needs your OK, color: "#9A5410", icon: alert-circle] {
+  Kaasu > Merchant: Mismatch / late / big
+  Merchant > Kaasu: Confirm (passkey)
+  Kaasu > Shop backend: Webhook: decision
+}
+Merchant > Kaasu: Statement CSV
+Kaasu > Merchant: Mismatches

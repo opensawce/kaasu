@@ -1,0 +1,51 @@
+name: Feature request
+description: Propose something Kaasu should do.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: brief
+    attributes:
+      label: Brief
+      description: One or two lines. What should exist that doesn't today?
+    validations:
+      required: true
+  - type: textarea
+    id: end_state
+    attributes:
+      label: End state
+      description: How we'll know it's done. One checkbox per outcome.
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Server
+        - Bank alerts and matching
+        - Customer checkout (web)
+        - Merchant dashboard
+        - Android
+        - iPhone / Mac
+        - Windows
+        - Design / brand
+        - Languages
+        - Hosting / install
+        - AI (optional features)
+        - Docs
+    validations:
+      required: true
+  - type: input
+    id: depends
+    attributes:
+      label: Depends on
+      description: Issue numbers this needs first, e.g. #6 #8
+  - type: checkboxes
+    id: money
+    attributes:
+      label: Money path
+      options:
+        - label: This could change whether a payment gets confirmed

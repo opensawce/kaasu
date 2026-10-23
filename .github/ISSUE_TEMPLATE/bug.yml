@@ -1,0 +1,77 @@
+name: Bug report
+description: Something isn't working as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Security issue?** Don't file it here. Use a [private security advisory](https://github.com/opensawce/kaasu/security/advisories/new).
+        **Never paste** account numbers, full UPI IDs, customer names, API keys or unredacted bank alerts.
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Money impact
+      options:
+        - A payment was confirmed that shouldn't have been
+        - A real payment was not confirmed
+        - Money-related display or totals are wrong
+        - No money impact
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: A `kaasu sim` scenario that reproduces it is the best possible report.
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Where
+      multiple: true
+      options:
+        - Server
+        - Customer pay page
+        - Merchant dashboard (web)
+        - Android Forwarder
+        - iPhone app
+        - Mac app
+        - Windows app
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `kaasu version`
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs (redacted)
+      render: text
+  - type: checkboxes
+    id: redacted
+    attributes:
+      label: Privacy
+      options:
+        - label: I removed account numbers, full UPI IDs, names and keys from everything above
+          required: true

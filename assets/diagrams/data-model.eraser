@@ -1,0 +1,106 @@
+title Kaasu: Data model (SQLite)
+colorMode bold
+styleMode shadow
+typeface clean
+
+receiving_accounts [icon: credit-card, color: "#0F7B5F"] {
+  id string pk
+  vpa string unique
+  bank string
+  auto_confirm_limit_paise int
+}
+
+orders [icon: shopping-bag, color: "#0F7B5F"] {
+  id string pk
+  account_id string
+  idempotency_key string unique
+  request_hash string
+  base_amount_paise int
+  amount_paise int
+  state string
+  queue_position int
+  customer_utr string
+  expires_at timestamp
+}
+
+amount_reservations [icon: lock, color: "#0F7B5F"] {
+  account_id string pk
+  amount_paise int pk
+  order_id string
+  hold_until timestamp
+}
+
+devices [icon: smartphone, color: "#E8A33D"] {
+  id string pk
+  public_key blob
+  paired_at timestamp
+  revoked_at timestamp
+}
+
+evidence [icon: inbox, color: "#E8A33D"] {
+  id string pk
+  device_id string
+  source string
+  raw blob
+  nonce string unique
+  fingerprint string
+  received_at timestamp
+}
+
+alerts [icon: file-text, color: "#E8A33D"] {
+  id string pk
+  evidence_id string
+  account_id string
+  amount_paise int
+  utr string unique
+  payer_vpa_masked string
+  alert_time timestamp
+}
+
+matches [icon: check-square, color: "#3FC59A"] {
+  id string pk
+  order_id string
+  alert_id string unique
+  score int
+  decision string
+  decided_by string
+}
+
+refunds [icon: rotate-ccw, color: "#9A5410"] {
+  id string pk
+  order_id string
+  amount_paise int
+  refund_utr string
+  logged_by string
+  created_at timestamp
+}
+
+ledger [icon: link, color: "#14171A"] {
+  seq int pk
+  entity_id string
+  event string
+  payload json
+  prev_hash string
+  hash string
+}
+
+outbox [icon: send, color: "#14171A"] {
+  id string pk
+  ledger_seq int
+  event_id string unique
+  payload json
+  attempts int
+  next_attempt_at timestamp
+  dead bool
+}
+
+receiving_accounts.id < orders.account_id
+receiving_accounts.id < amount_reservations.account_id
+orders.id - amount_reservations.order_id
+devices.id < evidence.device_id
+evidence.id < alerts.evidence_id
+orders.id < matches.order_id
+alerts.id - matches.alert_id
+orders.id < refunds.order_id
+orders.id < ledger.entity_id
+ledger.seq - outbox.ledger_seq

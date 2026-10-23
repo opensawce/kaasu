@@ -1,0 +1,33 @@
+title Kaasu: Order state machine
+direction down
+colorMode bold
+styleMode shadow
+typeface clean
+
+Created [shape: oval, icon: plus-circle, color: "#5B6168"]
+Queued [icon: list, color: "#5B6168", label: "Queued (amount pool full)"]
+Awaiting [icon: clock, color: "#E8A33D", label: "Awaiting payment"]
+Matched [shape: diamond, icon: check-square, color: "#3FC59A", label: "Alert matched"]
+Confirmed [shape: oval, icon: check-circle, color: "#0F7B5F"]
+Review [icon: alert-circle, color: "#9A5410", label: "Needs your OK"]
+Rejected [shape: oval, icon: x-circle, color: "#B42318"]
+Cancelled [shape: oval, icon: slash, color: "#5B6168"]
+Expired [icon: clock, color: "#5B6168", label: "Expired"]
+Late paid [icon: alert-triangle, color: "#9A5410", label: "Late paid"]
+Refunded [shape: oval, icon: rotate-ccw, color: "#9A5410", label: "Refunded"]
+Disputed [shape: oval, icon: alert-octagon, color: "#B42318", label: "Disputed"]
+
+Created > Awaiting: amount reserved
+Created > Queued: no free amount
+Queued > Awaiting: amount frees up
+Awaiting > Matched: signed alert
+Awaiting > Cancelled: shop / customer
+Awaiting > Expired: timeout
+Matched > Confirmed: exact amount, high score
+Matched > Review: mismatch or over limit
+Review > Confirmed: merchant OK
+Review > Rejected: not received
+Expired > Late paid: alert after expiry
+Late paid > Review
+Confirmed > Refunded: merchant refunds
+Confirmed > Disputed: not in statement

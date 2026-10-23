@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/opensawce/kaasu/security/advisories/new
+    about: Please report security issues privately, never in public issues.
+  - name: Contributing guide
+    url: https://github.com/opensawce/kaasu/blob/main/CONTRIBUTING.md
+    about: How to pick up work, the PR process, the CLA and the AI-assisted coding policy.

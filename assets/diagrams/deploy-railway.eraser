@@ -1,0 +1,45 @@
+title Kaasu on Railway: one-click self-host (one project per shop)
+direction right
+colorMode bold
+styleMode shadow
+typeface clean
+
+GitHub [icon: github, color: "#14171A", label: "GitHub repo"]
+Customers [icon: smartphone, color: "#5B6168", label: "Customers"]
+Forwarders [icon: android, color: "#E8A33D", label: "Forwarder apps"]
+Merchant laptop [icon: user, color: "#14171A", label: "Merchant laptop"]
+
+Railway project [icon: railway, color: "#7C3AED", label: "Railway project: kaasu-shop"] {
+  Edge [icon: globe, color: "#3FC59A", label: "Railway edge (auto TLS)"] {
+    Pay domain [icon: globe, color: "#3FC59A", label: "pay domain :443"]
+    Ingest domain [icon: lock, color: "#E8A33D", label: "ingest domain :8443"]
+  }
+  Production [icon: server, color: "#0F7B5F", label: "production"] {
+    Tailscale [icon: shield, color: "#14171A", label: "Tailscale service"]
+    Kaasu service [icon: server, color: "#0F7B5F", label: "Kaasu (Go, 1 replica)"]
+    Variables [icon: key, color: "#B42318", label: "Sealed vars"]
+    Volume [icon: hard-drive, color: "#14171A", label: "Volume /data"]
+    Cron [icon: clock, color: "#9A5410", label: "Restore test"]
+  }
+  Bucket [icon: archive, color: "#5B6168", label: "Railway Bucket"]
+}
+
+Push [icon: bell, color: "#E8A33D", label: "FCM / APNs"]
+Shop backend [icon: shopping-cart, color: "#14171A", label: "Shop backend"]
+Mailbox [icon: mail, color: "#5B6168", label: "Bank-alert inbox"]
+Merchant phone [icon: smartphone, color: "#14171A", label: "Merchant phone"]
+
+GitHub > Production: deploy
+Customers > Pay domain
+Forwarders > Ingest domain: signed alerts
+Merchant laptop > Tailscale: admin
+Tailscale > Kaasu service: private :9000
+Edge > Kaasu service
+Variables > Kaasu service
+Kaasu service > Volume
+Volume > Bucket: Litestream
+Cron > Bucket
+Kaasu service > Push
+Kaasu service > Shop backend: webhooks
+Kaasu service > Mailbox: IMAP
+Push > Merchant phone: voice alert

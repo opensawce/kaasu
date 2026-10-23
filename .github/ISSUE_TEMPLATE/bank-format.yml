@@ -1,0 +1,54 @@
+name: Bank alert format
+description: Report a bank SMS, email or app notification Kaasu doesn't read correctly.
+labels: ["area:alerts"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks! Real alert samples are how parsers get built. **Redact before posting:**
+        replace account digits with `X`, names with `NAME`, and keep the amount, layout, punctuation and sender ID exactly as they are.
+  - type: input
+    id: bank
+    attributes:
+      label: Bank
+      placeholder: e.g. HDFC Bank
+    validations:
+      required: true
+  - type: dropdown
+    id: channel
+    attributes:
+      label: Where the alert came from
+      options:
+        - SMS
+        - Email
+        - Bank app notification
+        - UPI app notification
+    validations:
+      required: true
+  - type: input
+    id: sender
+    attributes:
+      label: Sender ID or email domain
+      placeholder: e.g. VM-HDFCBK or alerts@hdfcbank.net
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: Redacted alert text
+      render: text
+      placeholder: Rs 499.07 credited to a/c XX1234 by UPI. UTR 4210XXXX1955 ...
+    validations:
+      required: true
+  - type: textarea
+    id: wrong
+    attributes:
+      label: What Kaasu did
+      description: Ignored it, read the wrong amount, missed the UTR...
+  - type: checkboxes
+    id: redacted
+    attributes:
+      label: Privacy
+      options:
+        - label: I removed account digits, names and anything that identifies a person
+          required: true

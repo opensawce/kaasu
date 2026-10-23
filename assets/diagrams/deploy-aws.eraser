@@ -1,0 +1,73 @@
+title Kaasu Cloud: managed hosting on AWS (ap-south-1, Mumbai)
+direction right
+colorMode bold
+styleMode shadow
+typeface clean
+
+Customers [icon: smartphone, color: "#5B6168", label: "Customers"]
+Forwarders [icon: android, color: "#E8A33D", label: "Forwarder apps"]
+Merchant admin [icon: user, color: "#14171A", label: "Merchant (dashboard)"]
+
+AWS Mumbai [icon: aws, color: "#232F3E", label: "AWS ap-south-1"] {
+  Control plane [icon: settings, color: "#E8A33D"] {
+    Provisioner [icon: aws-lambda, label: "Provisioner"]
+    Registry [icon: aws-dynamodb, label: "Tenant registry"]
+    Images [icon: aws-elastic-container-registry, label: "Signed images"]
+    Secrets [icon: aws-secrets-manager, label: "Secrets Manager"]
+  }
+  Edge [icon: globe, color: "#3FC59A"] {
+    Route 53 [icon: aws-route-53, label: "Route 53"]
+    CloudFront [icon: aws-cloudfront, label: "CloudFront"]
+    WAF [icon: aws-waf, label: "WAF"]
+  }
+  VPC [icon: aws-vpc, color: "#0F7B5F", label: "VPC (2 AZs)"] {
+    Public subnet [icon: aws-vpc, color: "#3FC59A"] {
+      ALB [icon: aws-elastic-load-balancing, label: "ALB (host routing)"]
+      Client VPN [icon: aws-client-vpn, label: "Admin VPN"]
+    }
+    Private subnet [icon: lock, color: "#0F7B5F"] {
+      Tenant A [icon: aws-fargate, color: "#0F7B5F", label: "Kaasu shop A"]
+      Tenant B [icon: aws-fargate, color: "#0F7B5F", label: "Kaasu shop B"]
+      Volumes [icon: aws-elastic-block-store, label: "EBS scratch"]
+      Endpoints [icon: aws-vpc, label: "VPC endpoints"]
+    }
+    Egress subnet [icon: aws-vpc, color: "#3FC59A"] {
+      NAT [icon: aws-nat-gateway, label: "NAT gateway"]
+    }
+  }
+  Data [icon: key, color: "#B42318", label: "Data and keys"] {
+    KMS [icon: aws-key-management-service, label: "KMS"]
+    Backups [icon: aws-simple-storage-service, label: "S3 (source of truth)"]
+  }
+  Notify [icon: aws-simple-notification-service, label: "SNS push"]
+  Ops [icon: activity, color: "#5B6168"] {
+    CloudWatch [icon: aws-cloudwatch, label: "CloudWatch"]
+    GuardDuty [icon: aws-guardduty, label: "GuardDuty"]
+    CloudTrail [icon: aws-cloudtrail, label: "CloudTrail"]
+  }
+}
+
+Mailboxes [icon: mail, color: "#5B6168", label: "Bank-alert inbox"]
+Shop backends [icon: shopping-cart, color: "#14171A", label: "Shop backends"]
+Merchant phone [icon: smartphone, color: "#14171A", label: "Merchant phone"]
+
+Customers > Route 53: pay page
+Forwarders > Route 53: signed alerts
+Route 53 > CloudFront
+CloudFront > WAF
+WAF > ALB
+ALB > Tenant A
+ALB > Tenant B
+Merchant admin > Client VPN
+Client VPN > Tenant A
+Control plane > Private subnet: deploy
+Tenant A > Volumes
+Tenant B > Volumes
+Volumes > Endpoints: Litestream
+Endpoints > Backups: restore on start
+Tenant A > NAT
+NAT > Mailboxes: IMAP
+NAT > Shop backends: webhooks
+Tenant A > Notify
+Notify > Merchant phone: voice alert
+Private subnet > Ops: logs
