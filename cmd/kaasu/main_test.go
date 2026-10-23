@@ -56,3 +56,35 @@ func TestMigrateIsIdempotent(t *testing.T) {
 		}
 	}
 }
+
+func TestKeygenAndRotateKey(t *testing.T) {
+	dir := t.TempDir()
+	envs := map[string]string{"KAASU_DATABASE_PATH": filepath.Join(dir, "k.db")}
+	getenv := func(k string) string { return envs[k] }
+
+	var out, errb bytes.Buffer
+	if code := run([]string{"keygen"}, getenv, &out, &errb); code != 0 {
+		t.Fatalf("keygen code=%d %q", code, errb.String())
+	}
+	oldKey := strings.TrimSpace(out.String())
+	out.Reset()
+	run([]string{"keygen"}, getenv, &out, &errb)
+	newKey := strings.TrimSpace(out.String())
+	if oldKey == newKey || len(oldKey) < 40 {
+		t.Fatalf("keys must be random and long: %q %q", oldKey, newKey)
+	}
+
+	envs["KAASU_MASTER_KEY"] = oldKey
+	if code := run([]string{"migrate"}, getenv, &out, &errb); code != 0 {
+		t.Fatalf("migrate: %q", errb.String())
+	}
+	out.Reset()
+	if code := run([]string{"rotate-key"}, getenv, &out, &errb); code != 1 || !strings.Contains(errb.String(), "KAASU_NEW_MASTER_KEY") {
+		t.Errorf("rotate-key without a new key should explain: code=%d err=%q", code, errb.String())
+	}
+	envs["KAASU_NEW_MASTER_KEY"] = newKey
+	errb.Reset()
+	if code := run([]string{"rotate-key"}, getenv, &out, &errb); code != 0 || !strings.Contains(out.String(), "rotated 0 secrets") {
+		t.Errorf("rotate-key: code=%d out=%q err=%q", code, out.String(), errb.String())
+	}
+}
