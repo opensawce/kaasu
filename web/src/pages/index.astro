@@ -2,6 +2,7 @@
 import Site from '../layouts/Site.astro';
 import Icon from '../components/Icon.astro';
 import Paisu from '../components/Paisu.astro';
+import { faq } from '../data/faq';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const img = (n: string) => `${base}/img/${n}`;
 
@@ -46,8 +47,16 @@ const langs = [
   ['മലയാളം', 'Malayalam'], ['मराठी', 'Marathi'], ['বাংলা', 'Bengali'], ['ગુજરાતી', 'Gujarati'],
   ['ਪੰਜਾਬੀ', 'Punjabi'], ['ଓଡ଼ିଆ', 'Odia'], ['English', 'English'],
 ] as const;
+const site = 'https://kaasu.opensawce.com';
+const jsonLd = [
+  { '@type': 'Organization', '@id': `${site}/#org`, name: 'OpenSawce', url: 'https://opensawce.com', logo: `${site}/favicon.svg`, sameAs: ['https://github.com/opensawce'], address: { '@type': 'PostalAddress', addressLocality: 'Bengaluru', addressCountry: 'IN' } },
+  { '@type': 'WebSite', '@id': `${site}/#site`, url: site, name: 'Kaasu', inLanguage: 'en-IN', publisher: { '@id': `${site}/#org` } },
+  { '@type': 'SoftwareApplication', '@id': `${site}/#app`, name: 'Kaasu', url: site, applicationCategory: 'BusinessApplication', applicationSubCategory: 'Payment confirmation', operatingSystem: 'Linux, macOS, Windows, Android, iOS', description: 'Free, open source UPI payment confirmation for small shops. Customers pay the merchant bank directly; Kaasu confirms the order from a verified bank alert.', license: 'https://www.gnu.org/licenses/agpl-3.0.html', isAccessibleForFree: true, offers: { '@type': 'Offer', price: '0', priceCurrency: 'INR' }, inLanguage: ['en','hi','ta','te','kn','ml','mr','bn','gu','pa','or'], codeRepository: 'https://github.com/opensawce/kaasu', image: `${site}/img/social-preview.png`, author: { '@id': `${site}/#org` } },
+  { '@type': 'FAQPage', mainEntity: faq.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })) },
+];
+
 ---
-<Site title="Kaasu: confirm UPI payments without touching the money" description="Free, open source payment confirmation for small shops. Customers pay your bank directly. Kaasu confirms the order.">
+<Site title="Kaasu: confirm UPI payments without touching the money" description="Free, open source UPI payment confirmation for small shops. Customers pay your bank directly and Kaasu confirms the order from a verified bank alert. No fees, no middleman." jsonLd={jsonLd}>
   <section class="hero">
     <div class="wrap hero-grid">
       <div>
@@ -187,6 +196,17 @@ const langs = [
           <li><Icon name="alert" size={20} /> Not instant if your bank sends alerts late</li>
           <li><Icon name="alert" size={20} /> Early software. Read the docs before real sales</li>
         </ul></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq" style="background:#fff;border-block:1px solid var(--line)">
+    <div class="wrap">
+      <div class="sec-head reveal"><div class="eyebrow">Questions</div><h2>Straight answers</h2></div>
+      <div class="faq">
+        {faq.map(([q, a]) => (
+          <details class="reveal"><summary>{q}<Icon name="arrow" size={18} /></summary><p>{a}</p></details>
+        ))}
       </div>
     </div>
   </section>
