@@ -135,3 +135,23 @@ func TestVerifyDetectsTampering(t *testing.T) {
 		t.Errorf("tampered: code=%d out=%q", code, out.String())
 	}
 }
+
+func TestAccountAndAPIKeyCommands(t *testing.T) {
+	var kb bytes.Buffer
+	run([]string{"keygen"}, func(string) string { return "" }, &kb, &bytes.Buffer{})
+	envs := map[string]string{"KAASU_DATABASE_PATH": filepath.Join(t.TempDir(), "k.db"), "KAASU_MASTER_KEY": strings.TrimSpace(kb.String())}
+	getenv := func(k string) string { return envs[k] }
+
+	var out, errb bytes.Buffer
+	if code := run([]string{"account", "add", "--vpa", "shop@okbank", "--bank", "HDFC", "--name", "Shop", "--limit-rupees", "5000"}, getenv, &out, &errb); code != 0 || !strings.Contains(out.String(), "acc_") {
+		t.Fatalf("account add: code=%d out=%q err=%q", code, out.String(), errb.String())
+	}
+	out.Reset()
+	if code := run([]string{"account", "add", "--vpa", "bad", "--bank", "x", "--name", "y"}, getenv, &out, &errb); code != 1 {
+		t.Errorf("invalid vpa should fail, code=%d", code)
+	}
+	out.Reset()
+	if code := run([]string{"apikey", "new", "WooCommerce"}, getenv, &out, &errb); code != 0 || !strings.Contains(out.String(), "kaasu_live_") || !strings.Contains(out.String(), "shown once") {
+		t.Fatalf("apikey new: code=%d out=%q", code, out.String())
+	}
+}
