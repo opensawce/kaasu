@@ -179,25 +179,53 @@ func TestPoolFullQueuesOrder(t *testing.T) {
 	}
 }
 
-func TestCancelPromotesNextQueued(t *testing.T) {
+func TestCancelKeepsReservationUntilGrace(t *testing.T) {
 	e := setup(t)
 	first, _, _ := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900}, "p0")
 	for i := 1; i < 100; i++ {
 		_, _, _ = e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900}, fmt.Sprintf("p%d", i))
 	}
-	q, _, _ := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900}, "pq")
+	// Long expiry so the queued order is still live once the first order's grace has ended.
+	q, _, _ := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900, ExpiresIn: 60 * time.Minute}, "pq")
 	if q.State != "queued" {
 		t.Fatalf("setup: want queued, got %s", q.State)
 	}
 	if _, err := e.svc.Cancel(e.ctx, first.ID); err != nil {
 		t.Fatal(err)
 	}
+	got, _ := e.svc.Get(e.ctx, q.ID)
+	if got.State != "queued" {
+		t.Fatalf("cancelled amount must stay held inside grace; queued order got %s", got.State)
+	}
+	// Past expiry plus the 10 minute grace, the sweep frees the slot and promotes the queued order.
+	e.clk.Advance(26 * time.Minute)
+	if err := e.svc.Sweep(e.ctx); err != nil {
+		t.Fatal(err)
+	}
 	got, err := e.svc.Get(e.ctx, q.ID)
 	if err != nil || got.State != "awaiting" || got.AmountPaise != 49900 {
-		t.Fatalf("queued order should be promoted into the freed slot: %+v err=%v", got, err)
+		t.Fatalf("after grace the queued order should be promoted: %+v err=%v", got, err)
 	}
 	if !strings.Contains(got.UPILink, "am=499.00") {
 		t.Errorf("promoted order must show its reserved paise in the link: %s", got.UPILink)
+	}
+}
+
+func TestQueuedOrderHasNoPayableLink(t *testing.T) {
+	e := setup(t)
+	for i := 0; i < 100; i++ {
+		_, _, _ = e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900}, fmt.Sprintf("p%d", i))
+	}
+	q, _, err := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900}, "pq")
+	if err != nil || q.State != "queued" {
+		t.Fatalf("setup: %+v %v", q, err)
+	}
+	if q.UPILink != "" {
+		t.Errorf("queued order must not carry a payable link, got %s", q.UPILink)
+	}
+	got, _ := e.svc.Get(e.ctx, q.ID)
+	if got.UPILink != "" {
+		t.Errorf("Get: queued order must not carry a payable link, got %s", got.UPILink)
 	}
 }
 

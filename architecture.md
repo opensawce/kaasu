@@ -16,6 +16,9 @@ Diagrams are drawn in Eraser. Source: `assets/diagrams/*.eraser` · Images: `ass
 ### Payment flow
 ![Payment confirmation flow](assets/diagrams/payment-flow.png)
 
+
+**Amount pool rules (issue #7, #8 hardening).** Each open order holds one exact paise amount from its base to base+99 on its account. A slot is held until `expires_at + 10 min` (grace). Cancelled, rejected and expired orders keep their slot until the grace ends; only a refund frees it at once. A queued order has no payable link: its UPI link appears only when it is promoted, and promotion gives it a fresh window of the same length. `Service.Sweep` promotes queued orders once slots free.
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 

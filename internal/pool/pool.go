@@ -87,14 +87,14 @@ func (p *Pool) Release(ctx context.Context, tx *sql.Tx, orderID string) error {
 }
 
 type queued struct {
-	id        string
-	base      int64
-	expiresAt time.Time
+	id       string
+	base     int64
+	duration time.Duration
 }
 
-func (p *Pool) queuedOrders(ctx context.Context, tx *sql.Tx, accountID string, now time.Time) ([]queued, error) {
-	rows, err := tx.QueryContext(ctx, `SELECT id, base_amount_paise, expires_at FROM orders
-		WHERE account_id = ? AND state = 'queued' AND expires_at > ? ORDER BY queued_at, id`, accountID, ts(now))
+func (p *Pool) queuedOrders(ctx context.Context, tx *sql.Tx, accountID string) ([]queued, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT id, base_amount_paise, expires_at, created_at FROM orders
+		WHERE account_id = ? AND state = 'queued' ORDER BY queued_at, id`, accountID)
 	if err != nil {
 		return nil, fmt.Errorf("pool: queue: %w", err)
 	}
@@ -102,13 +102,17 @@ func (p *Pool) queuedOrders(ctx context.Context, tx *sql.Tx, accountID string, n
 	var waiting []queued
 	for rows.Next() {
 		var q queued
-		var exp string
-		if err := rows.Scan(&q.id, &q.base, &exp); err != nil {
+		var exp, created string
+		if err := rows.Scan(&q.id, &q.base, &exp, &created); err != nil {
 			return nil, fmt.Errorf("pool: scan queued order: %w", err)
 		}
-		if q.expiresAt, err = time.Parse(time.RFC3339, exp); err != nil {
-			return nil, fmt.Errorf("pool: parse expiry: %w", err)
+		expAt, err1 := time.Parse(time.RFC3339, exp)
+		createdAt, err2 := time.Parse(time.RFC3339, created)
+		if err1 != nil || err2 != nil {
+			return nil, fmt.Errorf("pool: parse times: %w", errors.Join(err1, err2))
 		}
+		// A promoted order gets a fresh window of the same length it asked for, starting now.
+		q.duration = expAt.Sub(createdAt)
 		waiting = append(waiting, q)
 	}
 	if err := rows.Err(); err != nil {
@@ -122,21 +126,22 @@ func (p *Pool) queuedOrders(ctx context.Context, tx *sql.Tx, accountID string, n
 // A queued order waits past its original expires_at: its window restarts at promotion.
 func (p *Pool) PromoteQueued(ctx context.Context, tx *sql.Tx, accountID string) ([]string, error) {
 	now := p.clk.Now()
-	waiting, err := p.queuedOrders(ctx, tx, accountID, now)
+	waiting, err := p.queuedOrders(ctx, tx, accountID)
 	if err != nil {
 		return nil, err
 	}
 
 	var promoted []string
 	for _, q := range waiting {
-		amt, err := p.Reserve(ctx, tx, accountID, q.id, q.base, q.expiresAt)
+		newExp := now.Add(q.duration)
+		amt, err := p.Reserve(ctx, tx, accountID, q.id, q.base, newExp)
 		if errors.Is(err, ErrPoolFull) {
 			continue // that base range is full; orders on other base amounts may still fit
 		}
 		if err != nil {
 			return promoted, err
 		}
-		if _, err := tx.ExecContext(ctx, `UPDATE orders SET amount_paise = ?, queued_at = NULL WHERE id = ?`, amt, q.id); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE orders SET amount_paise = ?, expires_at = ?, queued_at = NULL WHERE id = ?`, amt, ts(newExp), q.id); err != nil {
 			return promoted, fmt.Errorf("pool: promote: %w", err)
 		}
 		promoted = append(promoted, q.id)
