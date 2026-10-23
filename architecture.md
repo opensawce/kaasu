@@ -51,6 +51,8 @@ Headers: `X-Kaasu-Device`, `X-Kaasu-Timestamp`, `X-Kaasu-Nonce` (16 to 64 charac
 
 **Design tokens (issue #22, partial).** `assets/tokens.json` is the single source for colour, status words, spacing, radius and touch size. `go run ./scripts/gen-tokens` writes `internal/web/static/tokens.css`. Tests check the generated file matches the JSON, the app and the marketing site agree on every shared colour, every status has an icon and a word, icons sit on the 24 px grid, and every status pair meets WCAG AA.
 
+**Languages (issue #28, partial).** The catalogue is `i18n/<lang>.json`, one flat file per language, embedded in the binary. Every language must have every English key with the same placeholders (a test enforces this). `i18n.T` falls back to English. Money renders with Indian grouping and Latin digits (`₹1,24,860.50`). `i18n/REVIEW.md` lists every string that still needs a native-speaker check; hi and ta are machine drafts, and te, kn, ml, mr, bn, gu, pa and or are English until translated.
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 

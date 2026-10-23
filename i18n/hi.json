@@ -1,0 +1,22 @@
+{
+  "status.received": "पैसे मिल गए",
+  "status.needs_ok": "आपकी मंज़ूरी चाहिए",
+  "status.waiting": "इंतज़ार",
+  "status.phone_offline": "फ़ोन ऑफ़लाइन",
+  "status.problem": "समस्या",
+  "pay.button": "{amount} किसी भी UPI ऐप से दें",
+  "pay.waiting.title": "आपके भुगतान का इंतज़ार",
+  "pay.waiting.step_open": "अपना UPI ऐप खोलें",
+  "pay.waiting.step_approve": "भुगतान की मंज़ूरी दें",
+  "pay.waiting.step_confirm": "हम पुष्टि करते हैं, आमतौर पर एक मिनट में",
+  "pay.already_paid": "पहले ही भुगतान कर दिया? दोबारा न करें।",
+  "pay.queued": "खाली जगह का इंतज़ार, आमतौर पर एक मिनट से कम।",
+  "pay.expired": "यह भुगतान लिंक समाप्त हो गया। दुकान से नया लिंक माँगें।",
+  "confirmed.title": "भुगतान प्राप्त हुआ",
+  "confirmed.paid_to": "को भुगतान",
+  "review.confirm": "भुगतान की पुष्टि करें",
+  "review.reject": "अस्वीकार करें",
+  "voice.received": "{amount} प्राप्त हुए",
+  "voice.test": "Kaasu आवाज़ काम कर रही है",
+  "error.generic": "कुछ गड़बड़ हुई। कोई पैसा नहीं कटा; थोड़ी देर बाद फिर कोशिश करें।"
+}
