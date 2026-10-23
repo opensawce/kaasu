@@ -170,25 +170,6 @@ func (e env) count(t *testing.T, q string) int {
 	return n
 }
 
-func (e env) order(t *testing.T, amount int64, ref string) orders.Order {
-	t.Helper()
-	o, _, err := e.ord.Create(e.ctx, orders.CreateInput{AmountPaise: amount, Reference: ref, ExpiresIn: time.Hour}, "k-"+ref+fmt.Sprint(amount))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return o
-}
-
-func (e env) limit(t *testing.T, accountID string, paise int64) {
-	t.Helper()
-	if err := e.st.Tx(e.ctx, func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(e.ctx, `UPDATE receiving_accounts SET auto_confirm_limit_paise=? WHERE id=?`, paise, accountID)
-		return err
-	}); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func goodParsed(amount int64, utr string) evidence.Parsed {
 	return evidence.Parsed{Bank: "HDFC", AmountPaise: amount, UTR: utr, PayerMasked: "sa***@okicici", OccurredAt: t0, Parser: "HDFC"}
 }
