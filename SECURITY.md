@@ -34,3 +34,14 @@ If you act in good faith, stay within this policy, and give us a reasonable time
 Kaasu is pre-release. Only `main` is supported until the first tagged release.
 
 See the [threat model](architecture.md#5-threat-model) for what we already defend against.
+
+## Verifying a release
+
+Each release ships binaries, `SHA256SUMS`, an SPDX SBOM and a Sigstore signature per file. To check one:
+
+```bash
+sha256sum -c SHA256SUMS
+cosign verify-blob --certificate kaasu-linux-amd64.pem --signature kaasu-linux-amd64.sig \
+  --certificate-identity-regexp 'https://github.com/opensawce/kaasu/.github/workflows/release.yml@.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com kaasu-linux-amd64
+```
