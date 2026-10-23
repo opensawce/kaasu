@@ -20,6 +20,7 @@ import (
 	"github.com/opensawce/kaasu/internal/clock"
 	"github.com/opensawce/kaasu/internal/config"
 	"github.com/opensawce/kaasu/internal/ledger"
+	"github.com/opensawce/kaasu/internal/obs"
 	"github.com/opensawce/kaasu/internal/secrets"
 	"github.com/opensawce/kaasu/internal/store"
 )
@@ -174,7 +175,7 @@ func openApp(getenv func(string) string, stderr io.Writer, quiet bool) (*app.App
 	if quiet {
 		logw = io.Discard
 	}
-	log := slog.New(slog.NewJSONHandler(logw, &slog.HandlerOptions{Level: level}))
+	log := obs.NewLogger(logw, level)
 	log.Info("master key loaded", "source", source)
 	a, err := app.New(cfg, key, log)
 	if err != nil {
