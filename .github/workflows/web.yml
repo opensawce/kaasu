@@ -1,7 +1,6 @@
 name: web
 on:
   pull_request:
-    paths: ['web/**', '.github/workflows/web.yml']
   push:
     branches: [main]
     paths: ['web/**', '.github/workflows/web.yml']
@@ -25,8 +24,8 @@ jobs:
         with: { name: site, path: web/dist, retention-days: 7 }
   deploy:
     needs: test
-    # Secrets are not available to pull requests from forks.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # Secrets are not available to pull requests from forks or to Dependabot.
+    if: github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
