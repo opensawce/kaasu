@@ -1,0 +1,191 @@
+---
+import Site from '../layouts/Site.astro';
+import Icon from '../components/Icon.astro';
+import Paisu from '../components/Paisu.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const img = (n: string) => `${base}/img/${n}`;
+
+const impact = [
+  ['percent', 'Zero fees', 'Money goes straight from the customer to your bank. Kaasu never holds it and never takes a cut.'],
+  ['volume', 'Hear every payment', 'The counter speaks the amount in your language, so you never stare at a phone.'],
+  ['shield', 'Hard to fool', 'A fake screenshot cannot mark an order paid. Only a verified bank alert can.'],
+  ['server', 'Yours to keep', 'Runs on your own machine. Your orders and customers stay with you.'],
+] as const;
+
+const steps = [
+  ['link', 'Share a pay link', 'Create an order, send the link or show the QR. The amount is exact, down to the paisa.'],
+  ['phone', 'Customer pays in any UPI app', 'They pay as they always do. Nothing new to install, no sign-up for them.'],
+  ['checkCircle', 'Kaasu confirms', 'Your bank alert is checked, matched to the order, and the screen turns green.'],
+] as const;
+
+const features = [
+  ['ledger', 'A ledger that proves itself', 'Every change is chained to the one before. Edit history and the check fails loudly.'],
+  ['alert', 'Needs your OK, not guesswork', 'Unsure matches wait for you with the evidence in front of you. Nothing is confirmed on a hunch.'],
+  ['bell', 'Webhooks for your shop', 'Tell your website, billing tool or stock sheet the moment an order is paid.'],
+  ['globe', 'Speaks your language', 'The whole app and the spoken amounts work in eleven Indian languages.'],
+  ['sparkles', 'Optional AI help', 'Bring your own key for summaries and reminders. It never sees alert text and never moves money.'],
+  ['lock', 'Private by design', 'Customer details are masked everywhere except the evidence you review.'],
+] as const;
+
+const screens = [
+  ['iphone-home.png', 'Home', 'Today at a glance, with what needs you first.'],
+  ['iphone-review.png', 'Review', 'One tap to approve or reject, with the evidence beside it.'],
+  ['android-forwarder.png', 'Forwarder', 'A small Android helper passes bank alerts along.'],
+  ['website-pay.png', 'Pay page', 'What your customer sees while they pay.'],
+] as const;
+
+const ledger = [
+  ['a3f9…d1e7', '₹499.07', 'ok'],
+  ['8b2a…f430', '₹1,200.00', 'ok'],
+  ['cc71…0982', '₹750.13', 'warn'],
+  ['e4f8…71bc', '₹299.00', 'ok'],
+] as const;
+
+const langs = [
+  ['हिन्दी', 'Hindi'], ['தமிழ்', 'Tamil'], ['తెలుగు', 'Telugu'], ['ಕನ್ನಡ', 'Kannada'],
+  ['മലയാളം', 'Malayalam'], ['मराठी', 'Marathi'], ['বাংলা', 'Bengali'], ['ગુજરાતી', 'Gujarati'],
+  ['ਪੰਜਾਬੀ', 'Punjabi'], ['ଓଡ଼ିଆ', 'Odia'], ['English', 'English'],
+] as const;
+---
+<Site title="Kaasu: confirm UPI payments without touching the money" description="Free, open source payment confirmation for small shops. Customers pay your bank directly. Kaasu confirms the order.">
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <h1>Know the money arrived. Without anyone holding it.</h1>
+        <p class="lead">Kaasu confirms UPI payments for small shops. Customers pay your bank directly, and the order turns green only when a real bank alert says so.</p>
+        <div class="row">
+          <a class="btn btn-primary" href={`${base}/docs/start/install/`}>Get started <Icon name="arrow" size={18} /></a>
+          <a class="btn btn-ghost" href="https://github.com/opensawce/kaasu"><Icon name="star" size={18} /> Star on GitHub</a>
+        </div>
+      </div>
+      <img class="hero-shot" src={img('hero.png')} width="1800" height="830" alt="Kaasu on a phone, a laptop and the customer pay page" />
+    </div>
+  </section>
+
+  <section class="strip" aria-label="Why Kaasu">
+    <div class="wrap strip-grid">
+      {impact.map(([i, t, d]) => (
+        <div class="stat"><div class="ico"><Icon name={i} /></div><h3>{t}</h3><p>{d}</p></div>
+      ))}
+    </div>
+  </section>
+
+  <section id="how" style="background:#fff;border-block:1px solid var(--line)">
+    <div class="wrap">
+      <div class="sec-head"><div class="eyebrow">How it works</div><h2>Three steps. No middleman.</h2></div>
+      <div class="grid3">
+        {steps.map(([i, t, d], n) => (
+          <div class="card"><div class="step-n">0{n + 1}</div><div class="ico"><Icon name={i} /></div><h3>{t}</h3><p>{d}</p></div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="sec-head"><div class="eyebrow">What you get</div><h2>Built for a busy counter</h2><p>Everything a small shop needs to trust a payment, and nothing it has to pay for.</p></div>
+      <div class="grid3">
+        {features.map(([i, t, d]) => (
+          <div class="card"><div class="ico gold"><Icon name={i} /></div><h3>{t}</h3><p>{d}</p></div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section style="background:#fff;border-block:1px solid var(--line)">
+    <div class="wrap">
+      <div class="sec-head"><div class="eyebrow">Screens</div><h2>Simple on every device</h2></div>
+      <div class="shots phones">
+        {screens.map(([f, t, d]) => (
+          <figure><img src={img(f)} width="780" height="1688" alt={`${t} screen`} loading="lazy" /><figcaption><b>{t}</b>{d}</figcaption></figure>
+        ))}
+      </div>
+      <div class="shots" style="margin-top:36px">
+        <figure class="wide"><img src={img('mac-dashboard.png')} width="2560" height="1600" alt="Kaasu dashboard on a Mac" loading="lazy" /><figcaption><b>Dashboard</b>Orders, needs-your-OK items and reconciliation on a bigger screen.</figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <section id="trust">
+    <div class="wrap split">
+      <div>
+        <div class="eyebrow">Trust</div>
+        <h2>A trail you can check</h2>
+        <p class="lead">Every payment decision is written once and chained to the last. Run one check and see whether anything was altered.</p>
+      </div>
+      <div class="ledger" role="group" aria-label="Example ledger">
+        <h3><Icon name="ledger" /> Ledger, last 4 events</h3>
+        {ledger.map(([id, amt, s]) => (
+          <div class="lrow">
+            <code>{id}</code><span class="amt">{amt}</span>
+            {s === 'ok'
+              ? <span class="pill ok"><Icon name="check" size={14} stroke={2.5} /> Confirmed</span>
+              : <span class="pill warn"><Icon name="alert" size={14} stroke={2.5} /> Needs OK</span>}
+          </div>
+        ))}
+        <div class="verify"><Icon name="shield" /> Ledger intact · 1,247 entries <small>Checked just now</small></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="background:#fff;border-block:1px solid var(--line)">
+    <div class="wrap split">
+      <div>
+        <div class="eyebrow">Languages</div>
+        <h2>Your shop, your language</h2>
+        <p class="lead">Screens, spoken amounts and receipts follow the language your customer and your staff are comfortable in.</p>
+      </div>
+      <div class="langs">
+        {langs.slice(0, 4).map(([n, e]) => <div class="lang">{n}<small>{e}</small></div>)}
+        <div class="lang" style="grid-column:1/-1">+ {langs.length - 4} more<small>Marathi, Bengali, Gujarati, Punjabi, Odia, Malayalam and English</small></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="dark" id="install">
+    <div class="wrap split">
+      <div>
+        <div class="eyebrow">Try it in minutes</div>
+        <h2>Run it on your own machine</h2>
+        <p class="lead">Start with demo data, send yourself a pretend bank alert, and watch an order turn green. Nothing leaves your computer.</p>
+        <div class="row" style="margin-top:26px"><a class="btn btn-light" href={`${base}/docs/start/install/`}>Read the install guide</a></div>
+      </div>
+      <pre class="term" aria-label="Install commands"><span class="c"># Start everything offline</span>
+<span class="p">$ </span>git clone https://github.com/opensawce/kaasu
+<span class="p">$ </span>cd kaasu &amp;&amp; make dev
+<span class="c"># Send a pretend signed bank alert</span>
+<span class="p">$ </span>kaasu sim exact-match
+<span class="ok">Order #1042 confirmed</span></pre>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="sec-head"><div class="eyebrow">Honest limits</div><h2>What it is, and what it is not</h2></div>
+      <div class="limits">
+        <div class="card yes"><h3>What it does</h3><ul>
+          <li><Icon name="checkCircle" size={20} /> Confirms payments from verified bank alerts</li>
+          <li><Icon name="checkCircle" size={20} /> Keeps a checkable record of every decision</li>
+          <li><Icon name="checkCircle" size={20} /> Asks you when it is not sure</li>
+        </ul></div>
+        <div class="card no"><h3>What it is not</h3><ul>
+          <li><Icon name="alert" size={20} /> Not a payment gateway. It never holds money</li>
+          <li><Icon name="alert" size={20} /> Not instant if your bank sends alerts late</li>
+          <li><Icon name="alert" size={20} /> Early software. Read the docs before real sales</li>
+        </ul></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta">
+    <div class="wrap">
+      <div style="display:flex;justify-content:center"><div style="background:#fff;border-radius:50%;width:120px;height:120px;display:grid;place-items:center;overflow:hidden"><Paisu size={92} /></div></div>
+      <h2 style="margin-top:20px">Free to use. Open to improve.</h2>
+      <p>Read the code, change it, or help build it. Everything is on GitHub.</p>
+      <div class="row">
+        <a class="btn btn-light" href={`${base}/docs/`}>Read the docs</a>
+        <a class="btn btn-outline-light" href="https://github.com/opensawce/kaasu"><Icon name="star" size={18} /> Star on GitHub</a>
+      </div>
+    </div>
+  </section>
+</Site>

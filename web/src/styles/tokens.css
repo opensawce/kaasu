@@ -1,0 +1,24 @@
+/* Single source for colour, type and shape. Mirrors design.md, brand section. */
+:root {
+  --green: #0F7B5F;
+  --green-deep: #0A5C47;
+  --mint: #3FC59A;
+  --gold: #E8A33D;
+  --ink: #14171A;
+  --paper: #F7F6F2;
+  --amber: #9A5410;
+  --red: #B42318;
+  --grey: #5B6168;
+  --body: #3D4247;
+  --line: #E3E1DA;
+  --green-tint: #E3F2EC;
+  --amber-tint: #FBEBD6;
+
+  --font-display: 'Bricolage Grotesque Variable', 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+}
