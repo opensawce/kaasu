@@ -1,0 +1,121 @@
+# CodeRabbit review rules for Kaasu. Source of truth for review behaviour; AGENTS.md holds the project rules.
+language: en-IN
+early_access: false
+
+reviews:
+  profile: assertive
+  request_changes_workflow: false
+  high_level_summary: true
+  high_level_summary_placeholder: "@coderabbitai summary"
+  review_status: true
+  commit_status: true
+  collapse_walkthrough: false
+  poem: false
+  auto_review:
+    enabled: true
+    drafts: false
+    auto_incremental_review: true
+    base_branches:
+      - main
+      - feat/.*
+      - web/.*
+      - chore/.*
+      - fix/.*
+
+  path_filters:
+    - "!**/*.golden"
+    - "!**/testdata/**"
+    - "!**/*.lock"
+    - "!**/package-lock.json"
+    - "!**/go.sum"
+    - "!**/*.png"
+    - "!**/*.webp"
+
+  path_instructions:
+    - path: "internal/match/**"
+      instructions: >-
+        MONEY PATH. Only this package may confirm a payment. Check: amounts are int64 paise (never float),
+        an auto-confirm needs an exact amount AND an authentic source AND score >= 80 AND an order under the
+        account limit, late or closed orders go to review, and Process is idempotent. Flag any new code path
+        that can reach confirmed without these checks. Every behaviour change needs a test.
+    - path: "internal/states/**"
+      instructions: >-
+        MONEY PATH. The transition table is the only place order state changes. Check every new edge against the
+        table in the card, that each transition writes a ledger row in the same transaction, and that refunds are
+        the only release of a held amount.
+    - path: "internal/ledger/**"
+      instructions: >-
+        MONEY PATH. The ledger is append-only and hash-chained. Flag anything that updates or deletes rows,
+        changes the hash inputs, or stores raw alert text or full payer identifiers.
+    - path: "internal/ingest/**"
+      instructions: >-
+        SECURITY. Every request is signed over the body hash, timestamp and nonce; the window is 60 seconds;
+        replays get 409; every failure is the same 401 with no detail. Flag any path that accepts an unsigned
+        or stale request, and any use of == on secrets.
+    - path: "internal/parsers/**"
+      instructions: >-
+        MONEY PATH. Amounts are integer paise parsed from the digit string. Flag ParseFloat or any float
+        arithmetic on money, any parser that accepts a debit, and any fixture with real customer data.
+    - path: "internal/email/**"
+      instructions: >-
+        SECURITY. DKIM is verified on the raw bytes; the signing domain must be an allow-listed bank domain
+        (exact or subdomain); the From address must align. Flag any path that trusts a message without DKIM.
+    - path: "internal/secrets/**"
+      instructions: >-
+        SECURITY. Secrets are envelope-encrypted (XChaCha20-Poly1305); the master key never lives in the
+        database; API keys are stored as SHA-256 hashes and shown once. Flag plaintext storage or logging.
+    - path: "internal/adminauth/**"
+      instructions: >-
+        SECURITY. Sessions are stored as hashes, cookies are HttpOnly, SameSite=Strict and Secure outside local
+        http; TOTP codes are single-use; lockout and the same reply for unknown names must hold. Flag any change
+        that weakens these.
+    - path: "internal/web/**"
+      instructions: >-
+        CUSTOMER PAGES. No third-party scripts, no inline scripts, no 'failed' copy while an outcome is
+        unknown, and no Paisu on customer pages. Text comes from the i18n catalogue, never hard-coded.
+    - path: "i18n/**"
+      instructions: >-
+        Every key must exist in every language with the same placeholders. Machine drafts must stay listed in
+        i18n/REVIEW.md. Do not mark a translation reviewed.
+    - path: "**/*.md"
+      instructions: >-
+        Documentation. Flag em dashes (U+2014) and claims the code does not back up. Keep copy plain.
+    - path: "web/**"
+      instructions: >-
+        Website. No em dashes. No emoji used as icons. No tech-stack wording on the landing page; talk about impact.
+    - path: "**/*.go"
+      instructions: >-
+        Go: stdlib first. Wrap errors with context. No package-level mutable globals. Table-driven tests. Money is
+        int64 paise. Flag any network call in tests.
+
+  tools:
+    golangci-lint:
+      enabled: false
+    gitleaks:
+      enabled: true
+    semgrep:
+      enabled: true
+    ast-grep:
+      enabled: false
+
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  opt_out: false
+  learnings:
+    scope: auto
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "AGENTS.md"
+      - "CONTRIBUTING.md"
+      - "architecture.md"
+      - "design.md"
+      - "SECURITY.md"
