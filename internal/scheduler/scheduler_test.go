@@ -174,3 +174,10 @@ func TestRunStopsOnCancel(t *testing.T) {
 		t.Fatal("Run did not stop after cancel")
 	}
 }
+
+func TestEveryRejectsSubSecondInterval(t *testing.T) {
+	r, _, _ := setup(t)
+	if err := r.Every("x", 500*time.Millisecond); err == nil {
+		t.Fatal("an interval under one second must be rejected")
+	}
+}

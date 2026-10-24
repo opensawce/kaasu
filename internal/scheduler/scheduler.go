@@ -59,7 +59,10 @@ func New(st *store.Store, clk clock.Clock, ids IDSource, log *slog.Logger) *Runn
 func (r *Runner) Register(kind string, h Handler) { r.handlers[kind] = h }
 
 // Every makes kind run now and then every d. The schedule is stored, so it survives restarts.
-func (r *Runner) Every(kind string, every time.Duration) {
+func (r *Runner) Every(kind string, every time.Duration) error {
+	if every < time.Second {
+		return fmt.Errorf("scheduler: %s interval %v is shorter than one second", kind, every)
+	}
 	now := r.clk.Now().UTC().Format(time.RFC3339)
 	err := r.st.Tx(context.Background(), func(tx *sql.Tx) error {
 		_, err := tx.Exec(`INSERT INTO recurring(kind, every_seconds, next_run_at) VALUES(?,?,?)
@@ -67,8 +70,9 @@ func (r *Runner) Every(kind string, every time.Duration) {
 		return err
 	})
 	if err != nil {
-		r.log.Error("scheduler: register recurring", "kind", kind, "err", err)
+		return fmt.Errorf("scheduler: register %s: %w", kind, err)
 	}
+	return nil
 }
 
 // Enqueue adds a job inside the caller's transaction, so it commits with the change that caused it.
@@ -138,6 +142,10 @@ func (r *Runner) enqueueRecurring(ctx context.Context) error {
 			}
 			dues = append(dues, d)
 		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return fmt.Errorf("scheduler: read recurring: %w", err)
+		}
 		if err := rows.Close(); err != nil {
 			return err
 		}
@@ -175,6 +183,10 @@ func (r *Runner) claim(ctx context.Context) ([]Job, error) {
 			}
 			j.Payload = json.RawMessage(payload)
 			out = append(out, j)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return fmt.Errorf("scheduler: read due jobs: %w", err)
 		}
 		if err := rows.Close(); err != nil {
 			return err

@@ -43,6 +43,7 @@ type App struct {
 	Jobs     *scheduler.Runner
 	Server   *server.Server
 	cancel   context.CancelFunc
+	jobsDone chan struct{}
 }
 
 // New opens the database, applies migrations and builds the services. It does not listen yet.
@@ -76,9 +77,20 @@ func New(cfg config.Config, key secrets.MasterKey, log *slog.Logger) (*App, erro
 			return err
 		})
 	})
-	a.Jobs.Every("orders.expire", 5*time.Second)
-	a.Jobs.Every("pool.sweep", time.Minute)
-	a.Jobs.Every("nonces.purge", 5*time.Minute)
+	a.Jobs.Register("jobs.purge", func(ctx context.Context, _ scheduler.Job) error {
+		return st.Tx(ctx, func(tx *sql.Tx) error {
+			_, err := tx.ExecContext(ctx, `DELETE FROM jobs WHERE status IN ('done','dead') AND created_at < ?`, clk.Now().Add(-7*24*time.Hour).UTC().Format(time.RFC3339))
+			return err
+		})
+	})
+	for kind, every := range map[string]time.Duration{
+		"orders.expire": 5 * time.Second, "pool.sweep": time.Minute, "nonces.purge": 5 * time.Minute, "jobs.purge": time.Hour,
+	} {
+		if err := a.Jobs.Every(kind, every); err != nil {
+			_ = st.Close()
+			return nil, err
+		}
+	}
 	a.Server = server.New(cfg, log)
 	// Ingest is served only on the ingest listener; admin and public never see /ingest/.
 	a.Server.Mount("ingest", "/ingest/", ingest.Handler(ingest.Deps{
@@ -96,13 +108,18 @@ func (a *App) Start() error {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	a.cancel = cancel
-	go a.Jobs.Run(ctx)
+	a.jobsDone = make(chan struct{})
+	go func() {
+		defer close(a.jobsDone)
+		a.Jobs.Run(ctx)
+	}()
 	return nil
 }
 
 func (a *App) Shutdown(ctx context.Context) error {
 	if a.cancel != nil {
 		a.cancel()
+		<-a.jobsDone // the scheduler must stop before the store closes, whatever ctx says
 	}
 	return errors.Join(a.Server.Shutdown(ctx), a.Store.Close())
 }

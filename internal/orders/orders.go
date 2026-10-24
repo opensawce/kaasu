@@ -310,23 +310,32 @@ func (s *Service) ExpireDue(ctx context.Context) (int, error) {
 		var id string
 		if err := rows.Scan(&id); err != nil {
 			rows.Close()
-			return 0, err
+			return 0, fmt.Errorf("expire: scan: %w", err)
 		}
 		ids = append(ids, id)
 	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return 0, fmt.Errorf("expire: read due orders: %w", err)
+	}
 	if err := rows.Close(); err != nil {
-		return 0, err
+		return 0, fmt.Errorf("expire: close: %w", err)
 	}
 	expired := 0
+	var errs []error
 	for _, id := range ids {
 		err := s.st.Tx(ctx, func(tx *sql.Tx) error {
 			_, err := s.sm.Transition(ctx, tx, id, "expired", map[string]any{"reason": "expiry"})
 			return err
 		})
-		if err != nil {
-			return expired, fmt.Errorf("expire %s: %w", id, err)
+		switch {
+		case errors.Is(err, states.ErrIllegal), errors.Is(err, states.ErrNotFound):
+			// paid, cancelled or gone since we listed it: no longer ours to expire
+		case err != nil:
+			errs = append(errs, fmt.Errorf("expire %s: %w", id, err))
+		default:
+			expired++
 		}
-		expired++
 	}
-	return expired, nil
+	return expired, errors.Join(errs...)
 }
