@@ -23,7 +23,7 @@ func TestCreateAndGet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if a.ID != "acc_000001" || !a.Active || a.CreatedAt != "2026-01-01T00:00:00Z" {
+	if a.ID != "acc_000001" || !a.Active || a.CreatedAt != "2026-01-01T00:00:00.000000Z" {
 		t.Errorf("unexpected account %+v", a)
 	}
 	got, err := s.Get(ctx, a.ID)
