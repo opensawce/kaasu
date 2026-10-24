@@ -88,6 +88,10 @@ func (v *Vault) RotateAll(ctx context.Context, next MasterKey) (int, error) {
 			}
 			all = append(all, r)
 		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return err
+		}
 		if err := rows.Close(); err != nil {
 			return err
 		}
