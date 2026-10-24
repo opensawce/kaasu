@@ -14,6 +14,6 @@ The **Kaasu for WooCommerce** plugin adds a payment method that sends the custom
 
 ## Good to know
 
-- Amounts are sent in whole paise, so ₹499.07 stays exactly that. Use it on INR shops only: the plugin does not yet hide itself for other currencies.
+- Amounts are sent in whole paise, so ₹499.07 stays exactly that. The payment method only appears when the shop currency is INR.
 - Each webhook is verified with its signature and de-duplicated by event id, so a retry that arrives after the first delivery is skipped.
 - A refund in WooCommerce does not move money. Refund in your bank app, then record it in Kaasu. See [Refunds](/docs/use/refunds/).

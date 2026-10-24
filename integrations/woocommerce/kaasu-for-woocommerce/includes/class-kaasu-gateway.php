@@ -32,6 +32,11 @@ final class Kaasu_Gateway extends WC_Payment_Gateway {
         ];
     }
 
+    /** Shown at checkout only for INR shops: Kaasu confirms UPI payments, which are rupees only. */
+    public function is_available(): bool {
+        return parent::is_available() && get_woocommerce_currency() === 'INR';
+    }
+
     public function process_payment($order_id): array {
         $order = wc_get_order($order_id);
         $amount = Kaasu_Amount::to_paise((string) $order->get_total());
