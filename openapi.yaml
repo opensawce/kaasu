@@ -27,6 +27,7 @@ paths:
         '200': { description: Replay of an earlier request with the same key and body }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
+        '413': { $ref: '#/components/responses/Error' }
         '422': { description: Idempotency-Key reused with a different body }
   /v1/orders/{id}:
     get:
@@ -36,6 +37,7 @@ paths:
         - { name: id, in: path, required: true, schema: { type: string } }
       responses:
         '200': { description: The order, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '401': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
   /v1/orders/{id}/cancel:
     post:
@@ -44,7 +46,8 @@ paths:
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: The cancelled order }
+        '200': { description: The cancelled order, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '404': { $ref: '#/components/responses/Error' }
         '409': { description: The order can no longer be cancelled }
 components:
   securitySchemes:
