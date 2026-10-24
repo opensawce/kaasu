@@ -1,6 +1,10 @@
 package paisu
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/opensawce/kaasu/i18n"
+)
 
 func TestHappyOnlyAfterConfirmation(t *testing.T) {
 	if Choose(Inputs{JustConfirmed: true, LiveSources: 1}) != Happy {
@@ -47,6 +51,16 @@ func TestEveryMoodHasLabelKey(t *testing.T) {
 	for _, m := range []Mood{Happy, Waiting, NeedsOK, Asleep, Worried} {
 		if Label(m) == "" {
 			t.Errorf("%s has no label", m)
+		}
+	}
+}
+
+func TestEveryMoodLabelIsTranslated(t *testing.T) {
+	for _, l := range i18n.Languages {
+		for _, m := range []Mood{Happy, Waiting, NeedsOK, Asleep, Worried} {
+			if got := i18n.T(l, Label(m)); got == Label(m) {
+				t.Errorf("%s/%s: label shows the raw key", l, m)
+			}
 		}
 	}
 }

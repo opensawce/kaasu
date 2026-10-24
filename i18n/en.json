@@ -19,5 +19,10 @@
   "review.reject": "Reject",
   "voice.received": "{amount} received",
   "voice.test": "Kaasu voice is working",
-  "error.generic": "Something went wrong. Nothing was charged; try again in a moment."
+  "error.generic": "Something went wrong. Nothing was charged; try again in a moment.",
+  "paisu.happy": "Paisu is cheering: payment received",
+  "paisu.waiting": "Paisu is waiting calmly",
+  "paisu.needs-ok": "Paisu is asking for your OK",
+  "paisu.asleep": "Paisu is asleep: no source is online",
+  "paisu.worried": "Paisu is worried: check webhooks or the ledger"
 }
