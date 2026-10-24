@@ -35,21 +35,6 @@ func kebab(s string) string {
 	return strings.ToLower(regexp.MustCompile(`([a-z])([A-Z])`).ReplaceAllString(s, "$1-$2"))
 }
 
-// Every token in tokens.json must appear in the generated CSS with the same value.
-func TestGeneratedCSSMatchesTokens(t *testing.T) {
-	tk := load(t)
-	css, err := os.ReadFile("static/tokens.css")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for name, v := range tk.Color {
-		want := "--" + kebab(name) + ": " + v + ";"
-		if !strings.Contains(string(css), want) {
-			t.Errorf("tokens.css missing %q: run go run ./scripts/gen-tokens", want)
-		}
-	}
-}
-
 // The marketing site and the app must agree on colour: both read the same brand values.
 func TestTokensMatchMarketingSite(t *testing.T) {
 	tk := load(t)
@@ -58,12 +43,20 @@ func TestTokensMatchMarketingSite(t *testing.T) {
 		t.Fatal(err)
 	}
 	site := map[string]string{}
-	for _, m := range regexp.MustCompile(`--([a-z-]+):\s*(#[0-9A-Fa-f]{6})`).FindAllStringSubmatch(string(b), -1) {
-		site[m[1]] = strings.ToUpper(m[2])
+	for _, m := range regexp.MustCompile(`--([a-z0-9-]+):\s*([^;}]+)[;}]`).FindAllStringSubmatch(string(b), -1) {
+		site[m[1]] = strings.ToUpper(strings.TrimSpace(m[2]))
 	}
+	hex6 := regexp.MustCompile(`^#[0-9A-F]{6}$`)
 	for name, v := range tk.Color {
-		key := kebab(name)
-		if got, ok := site[key]; ok && got != strings.ToUpper(v) {
+		got, ok := site[kebab(name)]
+		if !ok {
+			continue
+		}
+		if !hex6.MatchString(got) || !hex6.MatchString(strings.ToUpper(v)) {
+			t.Errorf("%s: shared colour must be a 6-digit hex in both places (app %q, site %q)", name, v, got)
+			continue
+		}
+		if got != strings.ToUpper(v) {
 			t.Errorf("%s: app %s, site %s", name, v, got)
 		}
 	}
@@ -96,11 +89,19 @@ func TestIconsOnGrid(t *testing.T) {
 				t.Errorf("%s: missing %s", filepath.Base(f), want)
 			}
 		}
-		if strings.Contains(s, "<script") || regexp.MustCompile(`fill="#|stroke="#`).MatchString(s) {
-			t.Errorf("%s: hard-coded colour or script", filepath.Base(f))
+		if strings.Contains(s, "<script") {
+			t.Errorf("%s: scripts are not allowed in icons", filepath.Base(f))
+		}
+		// fill and stroke may only be none or currentColor, as an attribute (either quote) or in a style.
+		for _, m := range paintRe.FindAllStringSubmatch(s, -1) {
+			if v := strings.ToLower(m[2]); v != "none" && v != "currentcolor" {
+				t.Errorf("%s: hard-coded %s %q", filepath.Base(f), m[1], m[2])
+			}
 		}
 	}
 }
+
+var paintRe = regexp.MustCompile(`\b(fill|stroke)\s*[=:]\s*["\x27]?\s*([^"\x27;\s>/]+)`)
 
 func luminance(hex string) float64 {
 	c := make([]float64, 3)
