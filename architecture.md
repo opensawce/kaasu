@@ -127,7 +127,7 @@ SQLite in WAL mode, STRICT tables, foreign keys on, one writer (`BEGIN IMMEDIATE
 
 | # | Threat | Defence | Test (#57) |
 |---|---|---|---|
-| T1 | Fake payment: forged screenshot, hand-typed UTR, made-up alert | Only `internal/match` confirms, and only from a verified alert; manual UTR goes to review | Forged and unsigned alerts never confirm |
+| T1 | Fake payment: forged screenshot, hand-typed UTR, made-up alert | Only `internal/match` confirms, and only from a verified alert; manual UTR goes to review. The shopkeeper can also compare the six-character check code on the customer's success page or receipt with their own app: it is an HMAC (key kept in settings, stable across restarts) that binds the order, the confirmation time and the amount, so a forged screenshot fails the comparison | Forged and unsigned alerts never confirm |
 | T2 | Replayed or edited device alert | Ed25519 over body hash, timestamp and nonce; 60 s window; nonce store | Replay, clock skew, tampered body rejected |
 | T3 | Spoofed bank email | DKIM on the raw message; bank domain allow-list | Bad signature and look-alike domain ignored |
 | T4 | Wrong order matched (amount collision, late alert) | Unique paise per open order; ambiguous or late matches go to review | Collision and late-alert scenarios |

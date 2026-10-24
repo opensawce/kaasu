@@ -39,7 +39,10 @@ func setupDone(t *testing.T) doneEnv {
 	if _, err := accs.Create(ctx, accounts.Input{VPA: "shop@okbank", Bank: "B", DisplayName: "Sharma Sweets"}); err != nil {
 		t.Fatal(err)
 	}
-	c := NewConfirmed(ord, st, "Sharma Sweets", "en", clk.Now)
+	c, err := NewConfirmed(ord, st, "Sharma Sweets", "en", clk.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return doneEnv{ctx: ctx, ord: ord, sm: sm, h: c.Handler(), c: c}
 }
 
@@ -131,8 +134,8 @@ func TestReceiptContentAndLanguages(t *testing.T) {
 	id := e.order(t, 9999950, "d4")
 	e.confirm(t, id)
 	_, body := e.get(t, "/pay/"+id+"/receipt")
-	if !strings.Contains(body, "₹99,999.50") || !strings.Contains(body, "Check code") {
-		t.Errorf("receipt missing amount or code")
+	if !strings.Contains(body, "₹99,999.50") || !strings.Contains(body, "Check code") || !strings.Contains(body, "INV-7") {
+		t.Errorf("receipt missing amount, code or reference")
 	}
 	rec, txt := e.get(t, "/pay/"+id+"/receipt?format=txt")
 	if rec.Code != 200 || !strings.Contains(txt, "Amount: ₹99,999.50") {
@@ -156,5 +159,16 @@ func TestClockAndReducedMotionCSS(t *testing.T) {
 	js, _ := os.ReadFile("static/done.js")
 	if !strings.Contains(string(js), "setInterval") {
 		t.Error("clock must tick")
+	}
+}
+
+func TestCheckCodeSurvivesARestart(t *testing.T) {
+	e := setupDone(t)
+	again, err := NewConfirmed(e.c.Orders, e.c.Store, "Sharma Sweets", "en", e.c.now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e.c.Code("ord_1", "2026-01-01T10:00:00Z", 100) != again.Code("ord_1", "2026-01-01T10:00:00Z", 100) {
+		t.Error("a second start on the same database must produce the same check codes")
 	}
 }

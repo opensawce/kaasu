@@ -115,7 +115,12 @@ func New(cfg config.Config, key secrets.MasterKey, log *slog.Logger) (*App, erro
 	pay := &web.Pay{Orders: a.Orders, Accounts: a.Accounts, ShopName: "Kaasu", ShopLang: "en"}
 	payMux := http.NewServeMux()
 	pay.Register(payMux)
-	web.NewConfirmed(a.Orders, st, "Kaasu", "en", clk.Now).Register(payMux)
+	conf, err := web.NewConfirmed(a.Orders, st, "Kaasu", "en", clk.Now)
+	if err != nil {
+		_ = st.Close()
+		return nil, err
+	}
+	conf.Register(payMux)
 	a.Server.Mount("public", "/pay/", payMux)
 	a.Server.Mount("public", "/static/", web.StaticHandler())
 	return a, nil
