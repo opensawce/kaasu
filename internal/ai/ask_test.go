@@ -34,3 +34,14 @@ func TestAskRejectsUnknownQueryName(t *testing.T) {
 		t.Error("a query name outside the enum must be refused")
 	}
 }
+
+func TestCeilSecondKeepsTheCurrentSecondInTheWindow(t *testing.T) {
+	at := time.Date(2026, 1, 1, 10, 0, 0, 500_000_000, time.UTC)
+	if got := ceilSecond(at); !got.Equal(time.Date(2026, 1, 1, 10, 0, 1, 0, time.UTC)) {
+		t.Errorf("got %v", got)
+	}
+	whole := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+	if got := ceilSecond(whole); !got.Equal(whole) {
+		t.Errorf("a whole second is unchanged: %v", got)
+	}
+}

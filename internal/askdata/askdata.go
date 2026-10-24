@@ -40,10 +40,11 @@ func Names() []string {
 func window(p Params) (time.Time, time.Time, error) {
 	from, err1 := time.Parse(time.RFC3339, p.From)
 	to, err2 := time.Parse(time.RFC3339, p.To)
-	if err1 != nil || err2 != nil || !to.After(from) || to.Sub(from) > 366*24*time.Hour {
+	// Stored timestamps are whole-second UTC text, so bounds must be too: a fraction would be lost by formatting.
+	if err1 != nil || err2 != nil || from.Nanosecond() != 0 || to.Nanosecond() != 0 || !to.After(from) || to.Sub(from) > 366*24*time.Hour {
 		return from, to, ErrParams
 	}
-	return from, to, nil
+	return from.UTC(), to.UTC(), nil
 }
 
 // Run executes one named query on the read pool. It returns ErrUnknownQuery for any other name.
@@ -59,7 +60,7 @@ func Run(ctx context.Context, st *store.Store, name string, p Params) (Result, e
 		var total int64
 		var n int
 		if err := db.QueryRowContext(ctx, `SELECT COALESCE(SUM(amount_paise),0), count(*) FROM orders
-			WHERE state IN ('confirmed','late_paid') AND confirmed_at >= ? AND confirmed_at < ? AND COALESCE(reference,'') <> 'setup-test'`,
+			WHERE state IN ('confirmed','late_paid') AND confirmed_at >= ? AND confirmed_at < ? AND id NOT IN (SELECT substr(key, 18) FROM settings WHERE key LIKE 'setup.test\_order.%' ESCAPE '\')`,
 			fromT.Format(time.RFC3339), toT.Format(time.RFC3339)).Scan(&total, &n); err != nil {
 			return res, err
 		}

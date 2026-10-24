@@ -32,6 +32,15 @@ type askAnswer struct {
 
 const askSystem = "Choose exactly one query name from the list, or none, and fill its dates (RFC 3339) and state if needed. Answer only with JSON."
 
+// ceilSecond rounds up to a whole second in UTC, since stored timestamps carry whole seconds only.
+func ceilSecond(t time.Time) time.Time {
+	t = t.UTC()
+	if t.Nanosecond() != 0 {
+		return t.Truncate(time.Second).Add(time.Second)
+	}
+	return t
+}
+
 // Ask answers a question with a fixed query. The result carries the numbers used, so the owner can check them.
 func Ask(ctx context.Context, s *Service, question string, now time.Time) (askdata.Result, error) {
 	resp, err := s.Run(ctx, "ask", askSystem, question, askSchema)
@@ -50,7 +59,7 @@ func Ask(ctx context.Context, s *Service, question string, now time.Time) (askda
 		p.From = now.AddDate(0, 0, -30).UTC().Format(time.RFC3339)
 	}
 	if p.To == "" {
-		p.To = now.UTC().Format(time.RFC3339)
+		p.To = ceilSecond(now).Format(time.RFC3339) // exclusive bound: keep the fraction of a second by rounding up
 	}
 	return askdata.Run(ctx, s.st, a.Query, p)
 }

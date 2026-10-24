@@ -38,6 +38,8 @@ func TestParamsValidated(t *testing.T) {
 		{From: "not a date", To: "2026-01-31T00:00:00Z"},
 		{From: "2026-02-01T00:00:00Z", To: "2026-01-01T00:00:00Z"},
 		{From: "2024-01-01T00:00:00Z", To: "2026-01-31T00:00:00Z"},
+		{From: "2026-01-01T00:00:00.5Z", To: "2026-01-31T00:00:00Z"}, // a fraction of a second would be lost
+		{From: "2026-01-01T00:00:00Z", To: "2026-01-31T00:00:00.25Z"},
 	}
 	for _, p := range bad {
 		if _, err := Run(ctx, st, "total_received", p); !errors.Is(err, ErrParams) {
