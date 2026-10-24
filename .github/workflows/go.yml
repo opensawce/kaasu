@@ -26,6 +26,8 @@ jobs:
       - uses: actions/setup-go@v5
         with: { go-version-file: go.mod }
       - run: make test-cover
+      - run: |
+          go tool cover -func=coverage.out | tail -1 | sed 's/^/Total coverage: /' >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with: { name: coverage, path: coverage.out, retention-days: 7 }
   fuzz:
