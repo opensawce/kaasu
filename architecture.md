@@ -33,6 +33,8 @@ Headers: `X-Kaasu-Device`, `X-Kaasu-Timestamp`, `X-Kaasu-Nonce` (16 to 64 charac
 
 **Email alerts (issue #17).** The owner's inbox is polled over IMAP with an app password read from the vault on each poll. A message counts as an alert only when its DKIM signature verifies on the raw bytes, the signing domain is an allow-listed bank domain (exact or real subdomain), and the From address is aligned with that domain. Anything else is rejected and logged as `email.rejected` with a reason, never with the body. A verified message is stored as email evidence and goes through the same parser and matcher as device alerts. Messages are deduplicated by their raw hash, so a re-polled message changes nothing.
 
+**Scheduler (issue #10).** Time-based work is rows in the `jobs` table, so a restart resumes pending work. Retries wait 10 s, 30 s, 2 min, 10 min, then 1 h, and a job is `dead` after 8 attempts. A job is claimed with a 5-minute lock in a short transaction, runs outside any transaction, and panics are recorded as failures. Recurring jobs are stored in `recurring`. Built-in jobs: `orders.expire` (every 5 s; expires an order exactly at `expires_at`), `pool.sweep` (every minute; promotes queued orders once grace has ended) and `nonces.purge` (every 5 minutes).
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 

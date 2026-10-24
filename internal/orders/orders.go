@@ -296,3 +296,46 @@ func (s *Service) Sweep(ctx context.Context) error {
 	}
 	return nil
 }
+
+// ExpireDue moves every awaiting or queued order whose expiry has passed to expired. Called by the scheduler.
+// An order expires exactly at expires_at. Its slot is kept until the grace window ends.
+func (s *Service) ExpireDue(ctx context.Context) (int, error) {
+	now := s.clk.Now().UTC().Format(time.RFC3339)
+	var ids []string
+	rows, err := s.st.Read().QueryContext(ctx, `SELECT id FROM orders WHERE state IN ('awaiting','queued') AND expires_at <= ?`, now)
+	if err != nil {
+		return 0, err
+	}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return 0, fmt.Errorf("expire: scan: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return 0, fmt.Errorf("expire: read due orders: %w", err)
+	}
+	if err := rows.Close(); err != nil {
+		return 0, fmt.Errorf("expire: close: %w", err)
+	}
+	expired := 0
+	var errs []error
+	for _, id := range ids {
+		err := s.st.Tx(ctx, func(tx *sql.Tx) error {
+			_, err := s.sm.Transition(ctx, tx, id, "expired", map[string]any{"reason": "expiry"})
+			return err
+		})
+		switch {
+		case errors.Is(err, states.ErrIllegal), errors.Is(err, states.ErrNotFound):
+			// paid, cancelled or gone since we listed it: no longer ours to expire
+		case err != nil:
+			errs = append(errs, fmt.Errorf("expire %s: %w", id, err))
+		default:
+			expired++
+		}
+	}
+	return expired, errors.Join(errs...)
+}

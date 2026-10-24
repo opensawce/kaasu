@@ -293,3 +293,64 @@ func TestNewOrderDoesNotJumpTheQueue(t *testing.T) {
 		t.Errorf("the new order gets the next free amount: %+v", newer)
 	}
 }
+
+func TestExpireDueAtExactExpiry(t *testing.T) {
+	e := setup(t)
+	o, _, _ := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900, ExpiresIn: 15 * time.Minute}, "exp1")
+	e.clk.Advance(15*time.Minute - time.Second)
+	if n, err := e.svc.ExpireDue(e.ctx); err != nil || n != 0 {
+		t.Fatalf("one second early: n=%d err=%v", n, err)
+	}
+	e.clk.Advance(time.Second)
+	if n, err := e.svc.ExpireDue(e.ctx); err != nil || n != 1 {
+		t.Fatalf("at expiry: n=%d err=%v", n, err)
+	}
+	got, _ := e.svc.Get(e.ctx, o.ID)
+	if got.State != "expired" {
+		t.Errorf("state=%s", got.State)
+	}
+}
+
+func TestCancelTwiceIsNotCancellable(t *testing.T) {
+	e := setup(t)
+	o, _, err := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900}, "c2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.svc.Cancel(e.ctx, o.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.svc.Cancel(e.ctx, o.ID); !errors.Is(err, ErrNotCancellable) {
+		t.Errorf("second cancel: %v", err)
+	}
+}
+
+func TestExpireDueReportsFailuresWithTheOrderID(t *testing.T) {
+	e := setup(t)
+	o, _, _ := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900, ExpiresIn: time.Minute}, "x1")
+	e.clk.Advance(2 * time.Minute)
+	ctx, cancel := context.WithCancel(e.ctx)
+	cancel()
+	if _, err := e.svc.ExpireDue(ctx); err == nil {
+		t.Fatal("a cancelled context must surface an error")
+	}
+	if n, err := e.svc.ExpireDue(e.ctx); err != nil || n != 1 {
+		t.Fatalf("a later run still expires %s: n=%d err=%v", o.ID, n, err)
+	}
+}
+
+func TestSweepSurfacesErrors(t *testing.T) {
+	e := setup(t)
+	ctx, cancel := context.WithCancel(e.ctx)
+	cancel()
+	if err := e.svc.Sweep(ctx); err == nil {
+		t.Error("a cancelled context must surface an error")
+	}
+}
+
+func TestUnknownAccountIsInvalid(t *testing.T) {
+	e := setup(t)
+	if _, _, err := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900, AccountID: "acc_nope"}, "u1"); !errors.Is(err, ErrInvalid) {
+		t.Errorf("unknown account: %v", err)
+	}
+}
