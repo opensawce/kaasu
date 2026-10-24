@@ -79,6 +79,25 @@ func (s *Store) Tx(ctx context.Context, fn func(*sql.Tx) error) error {
 	return nil
 }
 
+// PendingMigrations counts embedded migrations the database has not applied. It only reads: it creates nothing.
+func (s *Store) PendingMigrations(ctx context.Context) (int, error) {
+	entries, err := migrationFiles.ReadDir("migrations")
+	if err != nil {
+		return 0, err
+	}
+	var applied int
+	var exists int
+	if err := s.ro.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_master WHERE type='table' AND name='schema_migrations'`).Scan(&exists); err != nil {
+		return 0, fmt.Errorf("check migrations table: %w", err)
+	}
+	if exists == 1 {
+		if err := s.ro.QueryRowContext(ctx, `SELECT count(*) FROM schema_migrations`).Scan(&applied); err != nil {
+			return 0, fmt.Errorf("count applied migrations: %w", err)
+		}
+	}
+	return len(entries) - applied, nil
+}
+
 // Migrate applies every embedded migration that has not run yet. Safe to call repeatedly.
 func (s *Store) Migrate(ctx context.Context) error {
 	if _, err := s.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL) STRICT`); err != nil {

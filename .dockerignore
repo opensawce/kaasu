@@ -1,0 +1,8 @@
+.git
+.agents
+*.db
+.kaasu-dev
+bin
+web
+node_modules
+secrets
