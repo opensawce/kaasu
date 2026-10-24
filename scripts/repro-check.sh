@@ -6,7 +6,7 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 hashes=""
 for i in 1 2; do
   out=$(mktemp -d)
-  (cd "$root" && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false \
+  (cd "$root" && GOCACHE="$out/gocache" CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false \
     -ldflags "-s -w -X main.version=$version" -o "$out/kaasu" ./cmd/kaasu)
   hashes="$hashes $(sha256sum "$out/kaasu" | cut -d' ' -f1)"
   rm -rf "$out"

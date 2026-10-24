@@ -30,7 +30,9 @@ jobs:
           ext=""; [ "$GOOS" = windows ] && ext=".exe"
           go build -trimpath -buildvcs=false -ldflags "-s -w -X main.version=$VERSION" -o "kaasu-$GOOS-$GOARCH$ext" ./cmd/kaasu
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with: { name: bin-${{ matrix.goos }}-${{ matrix.goarch }}, path: kaasu-* }
+        with:
+          name: bin-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: kaasu-*
   publish:
     needs: build
     runs-on: ubuntu-latest
@@ -40,11 +42,12 @@ jobs:
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with: { path: dist, merge-multiple: true }
-      - name: Checksums
-        working-directory: dist
-        run: sha256sum kaasu-* > SHA256SUMS
       - uses: anchore/sbom-action@55dc4ee22412511ee8c3142cbea40418e6cec693 # v0.17.8
         with: { path: dist, format: spdx-json, output-file: dist/kaasu.spdx.json }
+      # The SBOM is listed in SHA256SUMS, and SHA256SUMS is signed, so the SBOM is authenticated too.
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum kaasu-* kaasu.spdx.json > SHA256SUMS
       - uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
       - name: Sign
         working-directory: dist

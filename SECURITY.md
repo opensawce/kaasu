@@ -40,7 +40,7 @@ See the [threat model](architecture.md#5-threat-model) for what we already defen
 Each release ships binaries, `SHA256SUMS`, an SPDX SBOM and a Sigstore signature per file. To check one:
 
 ```bash
-sha256sum -c SHA256SUMS
+sha256sum --ignore-missing -c SHA256SUMS   # checks only the files you downloaded
 cosign verify-blob --certificate kaasu-linux-amd64.pem --signature kaasu-linux-amd64.sig \
   --certificate-identity-regexp 'https://github.com/opensawce/kaasu/.github/workflows/release.yml@.*' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com kaasu-linux-amd64
