@@ -16,7 +16,7 @@ func FuzzImportCSV(f *testing.F) {
 		st := testutil.OpenStore(t)
 		accID := "acc_fuzz"
 		if err := st.Tx(context.Background(), func(tx *sql.Tx) error {
-			_, err := tx.Exec(`INSERT INTO receiving_accounts(id, vpa, bank, display_name, auto_confirm_limit_paise, active, created_at) VALUES(?,?,?,?,0,1,?)`,
+			_, err := tx.Exec(`INSERT OR IGNORE INTO receiving_accounts(id, vpa, bank, display_name, auto_confirm_limit_paise, active, created_at) VALUES(?,?,?,?,0,1,?)`,
 				accID, "fuzz@okbank", "B", "Fuzz", "2026-01-01T00:00:00Z")
 			return err
 		}); err != nil {
