@@ -47,6 +47,8 @@ Headers: `X-Kaasu-Device`, `X-Kaasu-Timestamp`, `X-Kaasu-Nonce` (16 to 64 charac
 
 **Logs and metrics (issue #42).** Every log line passes a redaction handler: VPAs keep two characters of the name, 12-digit UTRs and long account numbers keep their last four digits, API keys and bearer tokens are masked. Requests carry an `X-Request-Id`. `/metrics` (Prometheus text) is served on the admin listener only.
 
+**Simulator and outbound guard (issue #51, partial).** `kaasu sim --list` names the ten payment scenarios with the state each should end in. `sim.Send` signs an alert with a device key and posts it through the real ingest handler, so development runs production code. `sim.CheckOutbound` refuses any call that leaves the machine (localhost is allowed).
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 
