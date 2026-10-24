@@ -471,3 +471,19 @@ func TestDateOnlyAlertOnSameDayAutoConfirms(t *testing.T) {
 		t.Fatalf("a date-only alert on the order's day should confirm, state=%s", got)
 	}
 }
+
+// An alert read by the AI fallback can never auto-confirm, whatever the score.
+func TestAIParsedAlertNeverAutoConfirms(t *testing.T) {
+	e := setup(t)
+	acc, _ := e.acc.Create(e.ctx, accounts.Input{VPA: "shop@okbank", Bank: "B", DisplayName: "Shop", AutoConfirmLimitPaise: 1000000})
+	o, _, _ := e.ord.Create(e.ctx, orders.CreateInput{AmountPaise: 49907, AccountID: acc.ID, ExpiresIn: time.Hour}, "aifb")
+	p := goodParsed(49907, "191919191919")
+	p.Parser = "ai"
+	alert := e.makeAlert(t, "device", p, "unknown format read by AI")
+	if err := e.m.Process(e.ctx, alert); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.state(t, o.ID); got == "confirmed" {
+		t.Fatal("an AI-read alert must never confirm")
+	}
+}

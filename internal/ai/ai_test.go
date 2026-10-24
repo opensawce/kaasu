@@ -183,3 +183,13 @@ func TestValidateRejectsTrailingJSON(t *testing.T) {
 		t.Errorf("a single object passes: %v", err)
 	}
 }
+
+func TestExtractRejectsDateOnlyTimestamps(t *testing.T) {
+	if _, err := time.Parse(time.RFC3339, "2026-01-02"); err == nil {
+		t.Fatal("a bare date is not RFC 3339")
+	}
+	s, _ := extractSchema["properties"].(map[string]any)["occurred_at"].(map[string]any)
+	if d, _ := s["description"].(string); !strings.Contains(d, "RFC 3339") {
+		t.Error("the schema must tell the model to answer in RFC 3339")
+	}
+}
