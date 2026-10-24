@@ -16,6 +16,9 @@ Diagrams are drawn in Eraser. Source: `assets/diagrams/*.eraser` · Images: `ass
 ### Payment flow
 ![Payment confirmation flow](assets/diagrams/payment-flow.png)
 
+
+**Amount pool rules (issue #7, #8 hardening).** Each order that is not queued holds one exact paise amount from its base to base+99 on its account. A slot is held until `expires_at + 10 min` (grace). Cancelled, rejected and expired orders keep their slot until the grace ends; only a refund frees it at once. A queued order has no payable link: its UPI link appears only when it is promoted, and promotion gives it a fresh window of the same length. `Service.Sweep` promotes queued orders once slots free.
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 
@@ -28,7 +31,7 @@ SQLite in WAL mode, STRICT tables, foreign keys on, one writer (`BEGIN IMMEDIATE
 |---|---|---|
 | `receiving_accounts` | UPI IDs the shop receives on | unique VPA |
 | `orders` | one row per order, state, exact paise | unique idempotency key, state check |
-| `amount_reservations` | the unique amount an open order holds | primary key (account, amount) |
+| `amount_reservations` | the unique amount an order that is not queued holds | primary key (account, amount) |
 | `devices`, `nonces` | paired phones and replay protection | unique (device, nonce) |
 | `evidence`, `alerts` | raw alert bodies and parsed facts | unique raw hash, unique UTR |
 | `matches` | alert to order decisions | one match per alert |

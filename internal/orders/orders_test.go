@@ -179,25 +179,53 @@ func TestPoolFullQueuesOrder(t *testing.T) {
 	}
 }
 
-func TestCancelPromotesNextQueued(t *testing.T) {
+func TestCancelKeepsReservationUntilGrace(t *testing.T) {
 	e := setup(t)
 	first, _, _ := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900}, "p0")
 	for i := 1; i < 100; i++ {
 		_, _, _ = e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900}, fmt.Sprintf("p%d", i))
 	}
-	q, _, _ := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900}, "pq")
+	// Long expiry so the queued order is still live once the first order's grace has ended.
+	q, _, _ := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900, ExpiresIn: 60 * time.Minute}, "pq")
 	if q.State != "queued" {
 		t.Fatalf("setup: want queued, got %s", q.State)
 	}
 	if _, err := e.svc.Cancel(e.ctx, first.ID); err != nil {
 		t.Fatal(err)
 	}
+	got, _ := e.svc.Get(e.ctx, q.ID)
+	if got.State != "queued" {
+		t.Fatalf("cancelled amount must stay held inside grace; queued order got %s", got.State)
+	}
+	// Past expiry plus the 10 minute grace, the sweep frees the slot and promotes the queued order.
+	e.clk.Advance(26 * time.Minute)
+	if err := e.svc.Sweep(e.ctx); err != nil {
+		t.Fatal(err)
+	}
 	got, err := e.svc.Get(e.ctx, q.ID)
 	if err != nil || got.State != "awaiting" || got.AmountPaise != 49900 {
-		t.Fatalf("queued order should be promoted into the freed slot: %+v err=%v", got, err)
+		t.Fatalf("after grace the queued order should be promoted: %+v err=%v", got, err)
 	}
 	if !strings.Contains(got.UPILink, "am=499.00") {
 		t.Errorf("promoted order must show its reserved paise in the link: %s", got.UPILink)
+	}
+}
+
+func TestQueuedOrderHasNoPayableLink(t *testing.T) {
+	e := setup(t)
+	for i := 0; i < 100; i++ {
+		_, _, _ = e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900}, fmt.Sprintf("p%d", i))
+	}
+	q, _, err := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900}, "pq")
+	if err != nil || q.State != "queued" {
+		t.Fatalf("setup: %+v %v", q, err)
+	}
+	if q.UPILink != "" {
+		t.Errorf("queued order must not carry a payable link, got %s", q.UPILink)
+	}
+	got, _ := e.svc.Get(e.ctx, q.ID)
+	if got.UPILink != "" {
+		t.Errorf("Get: queued order must not carry a payable link, got %s", got.UPILink)
 	}
 }
 
@@ -227,5 +255,41 @@ func TestPoolFailureRollsBackOrder(t *testing.T) {
 	var n int
 	if err := e.svc.st.Read().QueryRow(`SELECT count(*) FROM orders`).Scan(&n); err != nil || n != 0 {
 		t.Errorf("no order may survive a failed reservation: n=%d err=%v", n, err)
+	}
+}
+
+func TestUnknownOrderErrors(t *testing.T) {
+	e := setup(t)
+	if _, err := e.svc.Get(e.ctx, "ord_nope"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("get: %v", err)
+	}
+	if _, err := e.svc.Cancel(e.ctx, "ord_nope"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("cancel: %v", err)
+	}
+}
+
+// A new order must not jump the queue: older queued orders get the freed slots first.
+func TestNewOrderDoesNotJumpTheQueue(t *testing.T) {
+	e := setup(t)
+	for i := 0; i < 100; i++ {
+		if _, _, err := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900, ExpiresIn: time.Minute}, fmt.Sprintf("a%d", i)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	waiting, _, err := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900, ExpiresIn: 60 * time.Minute}, "waiting")
+	if err != nil || waiting.State != "queued" {
+		t.Fatalf("setup: %+v %v", waiting, err)
+	}
+	e.clk.Advance(12 * time.Minute) // every first-batch hold (1 min + 10 min grace) has ended
+	newer, _, err := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900, ExpiresIn: 60 * time.Minute}, "newer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	old, _ := e.svc.Get(e.ctx, waiting.ID)
+	if old.State != "awaiting" || old.AmountPaise != 49900 {
+		t.Errorf("the older queued order must be promoted first: %+v", old)
+	}
+	if newer.State != "awaiting" || newer.AmountPaise == old.AmountPaise {
+		t.Errorf("the new order gets the next free amount: %+v", newer)
 	}
 }

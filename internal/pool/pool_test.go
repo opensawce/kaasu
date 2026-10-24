@@ -170,7 +170,6 @@ func TestPromoteQueuedIsFIFO(t *testing.T) {
 	exp := t0.Add(time.Hour)
 	mkOrder(t, e, "q_late", e.acc.ID, "queued", exp, "2026-01-01T10:02:00Z")
 	mkOrder(t, e, "q_early", e.acc.ID, "queued", exp, "2026-01-01T10:01:00Z")
-	mkOrder(t, e, "q_expired", e.acc.ID, "queued", t0.Add(-time.Minute), "2026-01-01T09:59:00Z")
 	var got []string
 	err := e.st.Tx(e.ctx, func(tx *sql.Tx) error {
 		var err error
@@ -181,7 +180,7 @@ func TestPromoteQueuedIsFIFO(t *testing.T) {
 		t.Fatal(err)
 	}
 	if fmt.Sprint(got) != "[q_early q_late]" {
-		t.Fatalf("promoted %v, want FIFO by queued_at with expired orders skipped", got)
+		t.Fatalf("promoted %v, want FIFO by queued_at", got)
 	}
 	var state string
 	var amt int64

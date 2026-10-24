@@ -81,8 +81,10 @@ func (m *Machine) Transition(ctx context.Context, tx *sql.Tx, orderID, to string
 	}
 
 	switch to {
-	case "rejected", "cancelled", "refunded":
-		// Expired orders keep their slot until the grace window ends, so a late alert cannot match a reused amount.
+	case "refunded":
+		// Only a refund frees the amount at once. Cancelled, rejected and expired orders keep their slot until
+		// the grace window ends (reserved_until), so a late payment cannot be credited to a reused amount.
+		// The sweep (Service.Sweep) promotes queued orders once that window has passed.
 		if err := m.pool.Release(ctx, tx, orderID); err != nil {
 			return from, err
 		}

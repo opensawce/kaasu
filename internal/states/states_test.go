@@ -339,8 +339,21 @@ func TestTerminalFreesSlotAndPromotes(t *testing.T) {
 	if _, err := tr(e, "f_000", "rejected", nil); err != nil {
 		t.Fatal(err)
 	}
+	if got := stateOf(t, e, "q_1"); got != "queued" {
+		t.Fatalf("rejected order's amount stays held inside grace, queued order state=%s", got)
+	}
+	// Only a refund frees the amount at once. f_001 is confirmed then refunded.
+	if _, err := tr(e, "f_001", "review", nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tr(e, "f_001", "confirmed", nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tr(e, "f_001", "refunded", nil); err != nil {
+		t.Fatal(err)
+	}
 	if got := stateOf(t, e, "q_1"); got != "awaiting" {
-		t.Fatalf("queued order should be promoted, state=%s", got)
+		t.Fatalf("refund should free a slot and promote the queued order, state=%s", got)
 	}
 }
 
@@ -410,13 +423,19 @@ func TestQueuedAtSetOnEntryAndPromotionIsFIFO(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := tr(e, "f_000", "review", nil); err != nil {
+	// A rejected order keeps its slot through the grace window, so free one directly and promote.
+	if err := e.st.Tx(e.ctx, func(tx *sql.Tx) error { return e.p.Release(e.ctx, tx, "f_000") }); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tr(e, "f_000", "rejected", nil); err != nil {
+	var promoted []string
+	if err := e.st.Tx(e.ctx, func(tx *sql.Tx) error {
+		var err error
+		promoted, err = e.p.PromoteQueued(e.ctx, tx, e.acc.ID)
+		return err
+	}); err != nil {
 		t.Fatal(err)
 	}
-	if a, b := stateOf(t, e, "q_b"), stateOf(t, e, "q_a"); a != "awaiting" || b != "queued" {
-		t.Fatalf("oldest queued order should win the freed slot: q_b=%s q_a=%s", a, b)
+	if len(promoted) != 1 || promoted[0] != "q_b" {
+		t.Fatalf("the oldest queued order must win the freed slot: %v", promoted)
 	}
 }
