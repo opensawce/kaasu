@@ -16,6 +16,7 @@ import (
 	"github.com/opensawce/kaasu/internal/clock"
 	"github.com/opensawce/kaasu/internal/config"
 	"github.com/opensawce/kaasu/internal/httpx"
+	"github.com/opensawce/kaasu/internal/obs"
 )
 
 // Addrs are the bound listener addresses (useful when configured with port 0).
@@ -127,7 +128,7 @@ func (s *Server) protect(name string, h http.Handler) http.Handler {
 	lim := limits[name]
 	rl := httpx.NewLimiter(clock.Real{}, lim.perSecond, lim.burst)
 	byIP := rl.Middleware(func(r *http.Request) string { return httpx.ClientIP(r, false) })
-	return httpx.Secure(httpx.Recover(s.log)(byIP(httpx.Timeout(15*time.Second)(httpx.MaxBody(64<<10)(h)))), false)
+	return obs.RequestID(httpx.Secure(httpx.Recover(s.log)(byIP(httpx.Timeout(15*time.Second)(httpx.MaxBody(64<<10)(h)))), false))
 }
 
 func (s *Server) closeListeners() {

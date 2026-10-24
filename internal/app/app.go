@@ -20,6 +20,7 @@ import (
 	"github.com/opensawce/kaasu/internal/id"
 	"github.com/opensawce/kaasu/internal/ingest"
 	"github.com/opensawce/kaasu/internal/match"
+	"github.com/opensawce/kaasu/internal/obs"
 	"github.com/opensawce/kaasu/internal/orders"
 	"github.com/opensawce/kaasu/internal/pool"
 	"github.com/opensawce/kaasu/internal/scheduler"
@@ -101,6 +102,8 @@ func New(cfg config.Config, key secrets.MasterKey, log *slog.Logger) (*App, erro
 		}
 	}
 	a.Server = server.New(cfg, log)
+	// Metrics are served on the admin listener only.
+	a.Server.Mount("admin", "/metrics", obs.Handler(obs.NewMetrics()))
 	// Ingest is served only on the ingest listener; admin and public never see /ingest/.
 	a.Server.Mount("ingest", "/ingest/", ingest.Handler(ingest.Deps{
 		Store: st, Clock: clk, Devices: a.Devices, Evidence: evidence.New(clk, ids),
