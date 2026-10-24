@@ -34,9 +34,12 @@ const (
 	timeout     = 10 * time.Second
 )
 
-// schedule is the wait after the nth failure (1-based); the last value is the final wait before dead-lettering.
-var schedule = []time.Duration{10 * time.Second, 30 * time.Second, 2 * time.Minute, 10 * time.Minute,
-	time.Hour, 6 * time.Hour, 12 * time.Hour, 24 * time.Hour}
+// backoff is the wait after the nth failed attempt (1-based). Attempt maxAttempts is dead-lettered, so there are seven waits.
+func backoff(attempt int) time.Duration {
+	waits := [...]time.Duration{10 * time.Second, 30 * time.Second, 2 * time.Minute, 10 * time.Minute,
+		time.Hour, 6 * time.Hour, 12 * time.Hour}
+	return waits[min(attempt-1, len(waits)-1)]
+}
 
 // Sign returns the X-Kaasu-Signature header value: t=<unix>,v1=<hex HMAC-SHA256(secret, t "." body)>.
 func Sign(secret string, t time.Time, body []byte) string {
@@ -194,6 +197,10 @@ func (d *Deliverer) Deliver(ctx context.Context) (int, error) {
 		}
 		items = append(items, x)
 	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return 0, fmt.Errorf("webhooks: read outbox: %w", err)
+	}
 	if err := rows.Close(); err != nil {
 		return 0, err
 	}
@@ -271,7 +278,7 @@ func (d *Deliverer) record(ctx context.Context, x due, now time.Time, code int, 
 			_, err := ledger.Append(ctx, tx, d.clk, ledger.Entry{Kind: "webhook.dead", Payload: map[string]any{"outbox_id": x.id, "attempts": attempts}})
 			return err
 		}
-		next := now.Add(schedule[min(attempts-1, len(schedule)-1)])
+		next := now.Add(backoff(attempts))
 		_, err := tx.ExecContext(ctx, `UPDATE outbox SET attempts=?, next_attempt_at=? WHERE id=?`, attempts, next.Format(time.RFC3339), x.id)
 		return err
 	})
