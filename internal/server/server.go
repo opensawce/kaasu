@@ -13,7 +13,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/opensawce/kaasu/internal/clock"
 	"github.com/opensawce/kaasu/internal/config"
+	"github.com/opensawce/kaasu/internal/httpx"
 )
 
 // Addrs are the bound listener addresses (useful when configured with port 0).
@@ -92,7 +94,7 @@ func (s *Server) Start() error {
 			return fmt.Errorf("listen %s on %s: %w", sp.name, sp.addr, err)
 		}
 		srv := &http.Server{
-			Handler:           sp.h,
+			Handler:           s.protect(sp.name, sp.h),
 			ReadHeaderTimeout: 10 * time.Second,
 			ReadTimeout:       30 * time.Second,
 			WriteTimeout:      30 * time.Second,
@@ -111,6 +113,21 @@ func (s *Server) Start() error {
 		}(l)
 	}
 	return nil
+}
+
+// limits are per client address: requests per second and burst. Public carries the order API (the load test runs 50 orders/s from one address), so it is the widest; admin is the tightest.
+var limits = map[string]struct {
+	perSecond float64
+	burst     int
+}{"public": {200, 400}, "ingest": {50, 100}, "admin": {10, 30}}
+
+// protect wraps every listener in the same baseline: headers, panic recovery, a request time limit, a body cap
+// and a per-address rate limit. The limiter is shared by all requests on that listener.
+func (s *Server) protect(name string, h http.Handler) http.Handler {
+	lim := limits[name]
+	rl := httpx.NewLimiter(clock.Real{}, lim.perSecond, lim.burst)
+	byIP := rl.Middleware(func(r *http.Request) string { return httpx.ClientIP(r, false) })
+	return httpx.Secure(httpx.Recover(s.log)(byIP(httpx.Timeout(15*time.Second)(httpx.MaxBody(64<<10)(h)))), false)
 }
 
 func (s *Server) closeListeners() {
