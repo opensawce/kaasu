@@ -308,3 +308,56 @@ func (s *Service) MarkDisputed(ctx context.Context, orderID string) error {
 		return err
 	})
 }
+
+// ValidateMapping parses every row with a mapping and reports the first row that fails. Nothing is stored.
+func ValidateMapping(data []byte, m Mapping) (rows int, err error) {
+	if len(data) > maxFileBytes {
+		return 0, errors.New("statement is larger than 10 MB")
+	}
+	cr := csv.NewReader(bytes.NewReader(data))
+	if m.Delimiter != 0 {
+		cr.Comma = m.Delimiter
+	}
+	cr.FieldsPerRecord = -1
+	header, err := cr.Read()
+	if err != nil {
+		return 0, fmt.Errorf("read header: %w", err)
+	}
+	idx := map[string]int{}
+	for i, h := range header {
+		idx[strings.TrimSpace(h)] = i
+	}
+	need := -1
+	for _, col := range []string{m.DateCol, m.DescCol, m.CreditCol, m.DebitCol, m.UTRCol} {
+		i, ok := idx[col]
+		if !ok {
+			return 0, fmt.Errorf("no %q column", col)
+		}
+		need = max(need, i)
+	}
+	for n := 1; ; n++ {
+		rec, err := cr.Read()
+		if errors.Is(err, io.EOF) {
+			return rows, nil
+		}
+		if err != nil {
+			return rows, fmt.Errorf("row %d: %w", n, err)
+		}
+		if rows >= maxRows {
+			return rows, errors.New("statement has too many rows")
+		}
+		if len(rec) <= need {
+			return rows, fmt.Errorf("row %d: has %d columns, need at least %d", n, len(rec), need+1)
+		}
+		if _, err := time.Parse(m.DateLayout, strings.TrimSpace(rec[idx[m.DateCol]])); err != nil {
+			return rows, fmt.Errorf("row %d: date does not match the layout", n)
+		}
+		if _, err := paise(rec[idx[m.CreditCol]]); err != nil {
+			return rows, fmt.Errorf("row %d: credit is not an amount", n)
+		}
+		if _, err := paise(rec[idx[m.DebitCol]]); err != nil {
+			return rows, fmt.Errorf("row %d: debit is not an amount", n)
+		}
+		rows++
+	}
+}
