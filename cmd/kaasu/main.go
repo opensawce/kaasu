@@ -27,7 +27,7 @@ import (
 // version is set at build time with -ldflags "-X main.version=...".
 var version = "dev"
 
-const usage = "usage: kaasu <serve|migrate|account|apikey|keygen|rotate-key|verify|backup|pair|version> [flags]"
+const usage = "usage: kaasu <serve|migrate|admin|account|apikey|keygen|rotate-key|verify|backup|pair|version> [flags]"
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Getenv, os.Stdout, os.Stderr))
@@ -56,6 +56,8 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		return 0
 	case "rotate-key":
 		return rotateKey(getenv, stdout, stderr)
+	case "admin":
+		return admin(args[1:], getenv, stdout, stderr)
 	case "account":
 		return account(args[1:], getenv, stdout, stderr)
 	case "apikey":
@@ -180,6 +182,45 @@ func openApp(getenv func(string) string, stderr io.Writer, quiet bool) (*app.App
 		return nil, nil, false
 	}
 	return a, log, true
+}
+
+// admin init creates an admin with a fresh TOTP secret and prints the authenticator link once.
+func admin(args []string, getenv func(string) string, stdout, stderr io.Writer) int {
+	const usage = "usage: kaasu admin init --name <name> [--role owner|staff]"
+	if len(args) < 3 || args[0] != "init" || args[1] != "--name" || args[2] == "" || (len(args) != 3 && len(args) != 5) {
+		fmt.Fprintln(stderr, usage)
+		return 2
+	}
+	name, role := args[2], "owner"
+	if len(args) == 5 {
+		if args[3] != "--role" || (args[4] != "owner" && args[4] != "staff") {
+			fmt.Fprintln(stderr, usage)
+			return 2
+		}
+		role = args[4]
+	}
+	a, _, ok := openApp(getenv, stderr, true)
+	if !ok {
+		return 1
+	}
+	defer a.Store.Close()
+	secret := make([]byte, 20)
+	if _, err := rand.Read(secret); err != nil {
+		fmt.Fprintln(stderr, "admin init:", err)
+		return 1
+	}
+	ctx := ledger.WithActor(context.Background(), "cli")
+	if _, err := a.Admin.CreateAdmin(ctx, name, role, secret); err != nil {
+		fmt.Fprintln(stderr, "admin init:", err)
+		return 1
+	}
+	uri, err := a.Admin.Enroll(ctx, name)
+	if err != nil {
+		fmt.Fprintln(stderr, "admin init:", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "%s\nAdd this to an authenticator app now. It is shown once.\n", uri)
+	return 0
 }
 
 func account(args []string, getenv func(string) string, stdout, stderr io.Writer) int {
