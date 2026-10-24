@@ -170,3 +170,30 @@ func mustExec(t *testing.T, s *store.Store, q string, args ...any) {
 		t.Fatalf("%s: %v", q, err)
 	}
 }
+
+func TestAppendRejectsTheSeparatorByteAndEmptyKind(t *testing.T) {
+	s := testutil.OpenStore(t)
+	for _, e := range []Entry{
+		{Kind: "order\x1fcreated"},
+		{Kind: "order.created", OrderID: "ord\x1f1"},
+		{Kind: "order.created", Actor: "a\x1fb"},
+		{},
+	} {
+		err := s.Tx(context.Background(), func(tx *sql.Tx) error {
+			_, err := Append(context.Background(), tx, clk, e)
+			return err
+		})
+		if err == nil {
+			t.Errorf("entry %+v must be rejected", e)
+		}
+	}
+}
+
+func TestDescribe(t *testing.T) {
+	if got := (Result{OK: true, Rows: 3}).Describe(); got != "ledger intact: 3 rows, chain valid" {
+		t.Errorf("ok: %q", got)
+	}
+	if got := (Result{FirstBadSeq: 2, Reason: "row contents do not match its hash"}).Describe(); got != "ledger BROKEN at row 2: row contents do not match its hash" {
+		t.Errorf("broken: %q", got)
+	}
+}
