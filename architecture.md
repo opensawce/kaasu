@@ -19,6 +19,8 @@ Diagrams are drawn in Eraser. Source: `assets/diagrams/*.eraser` · Images: `ass
 
 **Amount pool rules (issue #7, #8 hardening).** Each order that is not queued holds one exact paise amount from its base to base+99 on its account. A slot is held until `expires_at + 10 min` (grace). Cancelled, rejected and expired orders keep their slot until the grace ends; only a refund frees it at once. A queued order has no payable link: its UPI link appears only when it is promoted, and promotion gives it a fresh window of the same length. `Service.Sweep` promotes queued orders once slots free.
 
+**Evidence and dedupe (issue #15).** Raw alerts are stored byte-for-byte with their SHA-256; the same body twice is one row. A parsed payment is keyed by its UTR; when the UTR is missing it is keyed by a fingerprint of account hint, amount and a 5-minute time bucket. A second source for a known payment adds an `alert_sources` row instead of a new alert. Stored payer data is masked (`ra***@okicici`); the ledger records alert facts but never the raw text.
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 
