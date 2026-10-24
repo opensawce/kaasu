@@ -102,7 +102,7 @@ func (s *Service) Record(ctx context.Context, orderID string, amountPaise int64,
 // List returns the refunds of one order, oldest first.
 func (s *Service) List(ctx context.Context, orderID string) ([]Refund, error) {
 	rows, err := s.st.Read().QueryContext(ctx, `SELECT id, order_id, amount_paise, COALESCE(utr,''), COALESCE(note,''), created_at
-		FROM refunds WHERE order_id = ? ORDER BY created_at, id`, orderID)
+		FROM refunds WHERE order_id = ? ORDER BY created_at, rowid`, orderID)
 	if err != nil {
 		return nil, err
 	}
