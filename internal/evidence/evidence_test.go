@@ -127,16 +127,16 @@ func TestNoUTRFingerprintDedupe(t *testing.T) {
 }
 
 func TestFingerprintBucketBoundary(t *testing.T) {
-	a := Fingerprint("1234", 500, "", time.Unix(300*10+10, 0))
-	b := Fingerprint("1234", 500, "", time.Unix(300*10+299, 0))
-	c := Fingerprint("1234", 500, "", time.Unix(300*11, 0))
+	a := Fingerprint("1234", 500, time.Unix(300*10+10, 0))
+	b := Fingerprint("1234", 500, time.Unix(300*10+299, 0))
+	c := Fingerprint("1234", 500, time.Unix(300*11, 0))
 	if a != b {
 		t.Error("same 5-minute bucket must give the same fingerprint")
 	}
 	if a == c {
 		t.Error("crossing the bucket boundary must change the fingerprint")
 	}
-	if Fingerprint("1234", 501, "", time.Unix(3000, 0)) == Fingerprint("1234", 500, "", time.Unix(3000, 0)) {
+	if Fingerprint("1234", 501, time.Unix(3000, 0)) == Fingerprint("1234", 500, time.Unix(3000, 0)) {
 		t.Error("amount must be part of the fingerprint")
 	}
 }
@@ -236,5 +236,16 @@ func TestInvalidSourceRejected(t *testing.T) {
 	})
 	if !errors.Is(err, ErrInvalid) {
 		t.Errorf("want ErrInvalid, got %v", err)
+	}
+}
+
+func TestUTRlessAlertThenUTRAlertIsOnePayment(t *testing.T) {
+	svc, db, tx := setup(t)
+	e1, _ := save(t, svc, tx, "sms")
+	e2, _ := save(t, svc, tx, "email")
+	id1, _ := alert(t, svc, tx, e1, Parsed{AccountHint: "1234", AmountPaise: 500, OccurredAt: t0})
+	id2, isNew := alert(t, svc, tx, e2, Parsed{AccountHint: "1234", AmountPaise: 500, UTR: "123456789012", OccurredAt: t0})
+	if isNew || id1 != id2 || count(t, db, `SELECT count(*) FROM alerts`) != 1 || count(t, db, `SELECT count(*) FROM alerts WHERE utr = '123456789012'`) != 1 {
+		t.Fatal("the email with a UTR must join the earlier UTR-less alert and give it the UTR")
 	}
 }

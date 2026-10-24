@@ -70,16 +70,17 @@ func (s *Service) SaveEvidence(ctx context.Context, tx *sql.Tx, source, deviceID
 	return id, false, nil
 }
 
-// Fingerprint identifies one payment across sources when the UTR is missing. Time is bucketed to 5 minutes.
-func Fingerprint(accountHint string, amountPaise int64, utr string, occurred time.Time) string {
+// Fingerprint identifies one payment across sources. It ignores the UTR so a UTR-less SMS and a later
+// email carrying the UTR land on the same alert. Time is bucketed to 5 minutes.
+func Fingerprint(accountHint string, amountPaise int64, occurred time.Time) string {
 	bucket := occurred.Unix() / 300
-	h := sha256.Sum256([]byte(fmt.Sprintf("%s|%d|%s|%d", accountHint, amountPaise, utr, bucket)))
+	h := sha256.Sum256([]byte(fmt.Sprintf("%s|%d|%d", accountHint, amountPaise, bucket)))
 	return hex.EncodeToString(h[:])
 }
 
 // SaveAlert records the facts of an alert. A repeat of a known payment adds a source instead of an alert.
 func (s *Service) SaveAlert(ctx context.Context, tx *sql.Tx, evidenceID string, p Parsed) (string, bool, error) {
-	fp := Fingerprint(p.AccountHint, p.AmountPaise, p.UTR, p.OccurredAt)
+	fp := Fingerprint(p.AccountHint, p.AmountPaise, p.OccurredAt)
 	existing, err := findExisting(ctx, tx, p.UTR, fp)
 	if err != nil {
 		return "", false, err
@@ -127,14 +128,23 @@ func findExisting(ctx context.Context, tx *sql.Tx, utr, fp string) (string, erro
 			return "", err
 		}
 	}
-	if utr == "" {
-		err := tx.QueryRowContext(ctx, `SELECT id FROM alerts WHERE fingerprint = ? LIMIT 1`, fp).Scan(&id)
-		if err == nil {
-			return id, nil
+	// No UTR: any alert for the same payment. With a UTR: only an alert that has none yet, so two
+	// payments with different UTRs stay separate.
+	q := `SELECT id FROM alerts WHERE fingerprint = ? ORDER BY occurred_at LIMIT 1`
+	if utr != "" {
+		q = `SELECT id FROM alerts WHERE fingerprint = ? AND utr IS NULL ORDER BY occurred_at LIMIT 1`
+	}
+	err := tx.QueryRowContext(ctx, q, fp).Scan(&id)
+	if err == nil {
+		if utr != "" {
+			if _, err := tx.ExecContext(ctx, `UPDATE alerts SET utr = ? WHERE id = ?`, utr, id); err != nil {
+				return "", fmt.Errorf("attach utr: %w", err)
+			}
 		}
-		if !errors.Is(err, sql.ErrNoRows) {
-			return "", err
-		}
+		return id, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return "", err
 	}
 	return "", nil
 }
