@@ -124,3 +124,30 @@ func TestLintTemplatesEmptyDirPasses(t *testing.T) {
 		t.Errorf("raw text should be flagged: %v", bad)
 	}
 }
+
+func TestLintFlagsTextThatStartsWithWhitespace(t *testing.T) {
+	dir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(dir, "x.html"), []byte("<p>\n   Hello there\n</p>"), 0o644)
+	if bad, _ := LintTemplates(dir); len(bad) != 1 {
+		t.Errorf("indented raw text should be flagged: %v", bad)
+	}
+	_ = os.WriteFile(filepath.Join(dir, "x.html"), []byte("<p>\n   {{ t .L \"a.b\" }}\n</p>"), 0o644)
+	if bad, _ := LintTemplates(dir); len(bad) != 0 {
+		t.Errorf("translated text must pass: %v", bad)
+	}
+}
+
+func TestAcceptLanguageIgnoresBadWeights(t *testing.T) {
+	for _, h := range []string{"hi;q=abc,en", "hi;q=NaN,en", "hi;q=Inf,en", "hi;q=2,en", "hi;q=-1,en"} {
+		if got := FromAcceptLanguage(h, "ta"); got != "en" {
+			t.Errorf("%q -> %s, want en (the bad hi weight is dropped)", h, got)
+		}
+	}
+}
+
+func TestSpokenWholeRupeesUsesIndianGrouping(t *testing.T) {
+	got := Spoken(12500000, "en")
+	if !strings.Contains(got, "₹1,25,000") || strings.Contains(got, ".00") {
+		t.Errorf("got %q", got)
+	}
+}

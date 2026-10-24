@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -89,10 +90,11 @@ func Rupees(paise int64, _ Lang) string {
 
 // Spoken is the text read aloud for an amount: whole rupees when the paise are zero, otherwise rupees and paise.
 func Spoken(paise int64, l Lang) string {
+	amount := Rupees(paise, l)
 	if paise%100 == 0 {
-		return T(l, "voice.received", "amount", "₹"+strconv.FormatInt(paise/100, 10))
+		amount = strings.TrimSuffix(amount, ".00")
 	}
-	return T(l, "voice.received", "amount", Rupees(paise, l))
+	return T(l, "voice.received", "amount", amount)
 }
 
 // FromAcceptLanguage picks the first supported language from an Accept-Language header, else the shop default.
@@ -106,11 +108,13 @@ func FromAcceptLanguage(header string, shopDefault Lang) Lang {
 		tag, params, _ := strings.Cut(strings.TrimSpace(part), ";")
 		q := 1.0
 		if params != "" {
-			if v, err := strconv.ParseFloat(strings.TrimPrefix(strings.TrimSpace(params), "q="), 64); err == nil {
-				q = v
+			v, err := strconv.ParseFloat(strings.TrimPrefix(strings.TrimSpace(params), "q="), 64)
+			if err != nil {
+				continue // a malformed weight is not a usable candidate
 			}
+			q = v
 		}
-		if q <= 0 {
+		if math.IsNaN(q) || q <= 0 || q > 1 {
 			continue
 		}
 		base := strings.ToLower(strings.Split(tag, "-")[0])
@@ -154,7 +158,7 @@ func Catalogue(l Lang) map[string]string { return catalogue[l] }
 func LintTemplates(dir string) ([]string, error) {
 	var bad []string
 	files, _ := filepath.Glob(filepath.Join(dir, "*.html"))
-	text := regexp.MustCompile(`>[^<{}\s][^<]*[A-Za-z]{2,}[^<]*<`)
+	text := regexp.MustCompile(`>\s*[^<{}\s][^<]*[A-Za-z]{2,}[^<]*<`)
 	for _, f := range files {
 		b, err := os.ReadFile(f)
 		if err != nil {
