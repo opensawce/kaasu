@@ -110,7 +110,7 @@ func rotateKey(getenv func(string) string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "config:", err)
 		return 1
 	}
-	cur, _, err := secrets.LoadMasterKey(getenv, secrets.MacKeychain)
+	cur, _, err := secrets.LoadMasterKey(getenv, keychainFor(getenv))
 	if err != nil {
 		fmt.Fprintln(stderr, "current key:", err)
 		return 1
@@ -172,7 +172,7 @@ func openApp(getenv func(string) string, stderr io.Writer, quiet bool) (*app.App
 		fmt.Fprintln(stderr, "config:", err)
 		return nil, nil, false
 	}
-	key, source, err := secrets.LoadMasterKey(getenv, secrets.MacKeychain)
+	key, source, err := secrets.LoadMasterKey(getenv, keychainFor(getenv))
 	if err != nil {
 		fmt.Fprintln(stderr, "master key:", err)
 		return nil, nil, false
@@ -209,7 +209,7 @@ func doctor(getenv func(string) string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return code
 	}
-	_, src, err := secrets.LoadMasterKey(getenv, secrets.MacKeychain)
+	_, src, err := secrets.LoadMasterKey(getenv, keychainFor(getenv))
 	report(err == nil, "master key", errText(err, "from "+src))
 	st, err := store.Open(cfg.DatabasePath)
 	report(err == nil, "database", errText(err, cfg.DatabasePath))
@@ -217,11 +217,22 @@ func doctor(getenv func(string) string, stdout, stderr io.Writer) int {
 		return code
 	}
 	defer st.Close()
-	err = st.Migrate(context.Background())
+	pending, err := st.PendingMigrations(context.Background()) // read-only: doctor never changes the database
+	if err == nil && pending > 0 {
+		err = fmt.Errorf("%d migration(s) pending: start kaasu or run kaasu migrate", pending)
+	}
 	report(err == nil, "migrations", errText(err, "up to date"))
 	res, err := ledger.Verify(context.Background(), st.Read())
 	report(err == nil && res.OK, "ledger", errText(err, res.Describe()))
 	return code
+}
+
+// keychainFor is the macOS keychain, unless KAASU_DISABLE_KEYCHAIN=1 (containers, CI and tests).
+func keychainFor(getenv func(string) string) func() (string, error) {
+	if getenv("KAASU_DISABLE_KEYCHAIN") == "1" {
+		return func() (string, error) { return "", os.ErrNotExist }
+	}
+	return secrets.MacKeychain
 }
 
 func errText(err error, ok string) string {

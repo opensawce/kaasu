@@ -6,6 +6,7 @@ Wants=network-online.target
 [Service]
 User=kaasu
 Group=kaasu
+StateDirectory=kaasu
 ExecStart=/usr/local/bin/kaasu serve
 Environment=KAASU_DATABASE_PATH=/var/lib/kaasu/kaasu.db
 LoadCredential=kaasu-master-key:/etc/kaasu/master.key

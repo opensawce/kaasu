@@ -43,17 +43,20 @@ if [ "$DRY" = 0 ]; then
   install -m 0755 "$tmp/$asset" /usr/local/bin/kaasu
   rm -rf "$tmp"
   if [ ! -f /etc/kaasu/master.key ]; then
-    /usr/local/bin/kaasu keygen > /etc/kaasu/master.key
-    chmod 0400 /etc/kaasu/master.key
-    chown root:root /etc/kaasu/master.key
+    # Written under a private umask into a temporary file, then moved into place, so the key is never readable by others.
+    ( umask 077; keytmp=$(mktemp /etc/kaasu/.master.key.XXXXXX) && /usr/local/bin/kaasu keygen > "$keytmp" && mv "$keytmp" /etc/kaasu/master.key )
   fi
+  chmod 0400 /etc/kaasu/master.key
+  chown root:root /etc/kaasu/master.key
   echo "verify the release signature with cosign (see SECURITY.md) if you have it installed"
 else
   echo "would: install /usr/local/bin/kaasu after checking its SHA-256"
   echo "would: create /etc/kaasu/master.key (0400) with kaasu keygen if missing"
 fi
 
-run install -m 0644 deploy/systemd/kaasu.service /etc/systemd/system/kaasu.service
+here=$(cd "$(dirname "$0")" && pwd)
+run install -m 0644 "$here/deploy/systemd/kaasu.service" /etc/systemd/system/kaasu.service
 run systemctl daemon-reload
-run systemctl enable --now kaasu
+run systemctl enable kaasu
+run systemctl restart kaasu # restart, so an already-running instance picks up the new binary and unit
 echo "done. Next: kaasu admin init --name <your name> (run as the kaasu user, pointing at /var/lib/kaasu/kaasu.db)"

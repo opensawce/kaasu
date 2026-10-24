@@ -5,3 +5,4 @@
 bin
 web
 node_modules
+secrets

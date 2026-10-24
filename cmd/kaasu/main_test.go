@@ -173,7 +173,7 @@ func TestAdminInitPrintsEnrollmentOnce(t *testing.T) {
 
 func TestDoctorFailsWithoutKeyAndPassesWithOne(t *testing.T) {
 	var out, errb bytes.Buffer
-	envs := map[string]string{"KAASU_DATABASE_PATH": filepath.Join(t.TempDir(), "d.db")}
+	envs := map[string]string{"KAASU_DATABASE_PATH": filepath.Join(t.TempDir(), "d.db"), "KAASU_DISABLE_KEYCHAIN": "1"}
 	getenv := func(k string) string { return envs[k] }
 	if code := run([]string{"doctor"}, getenv, &out, &errb); code != 1 || !strings.Contains(out.String(), "FAIL master key") {
 		t.Errorf("no key should FAIL: code=%d out=%q", code, out.String())
@@ -181,6 +181,19 @@ func TestDoctorFailsWithoutKeyAndPassesWithOne(t *testing.T) {
 	var kb bytes.Buffer
 	run([]string{"keygen"}, func(string) string { return "" }, &kb, &bytes.Buffer{})
 	envs["KAASU_MASTER_KEY"] = strings.TrimSpace(kb.String())
+	// doctor only reads, so an unmigrated database is reported, not fixed.
+	out.Reset()
+	if code := run([]string{"doctor"}, getenv, &out, &errb); code == 0 || !strings.Contains(out.String(), "pending") {
+		t.Errorf("unmigrated database must FAIL as pending: code=%d out=%q", code, out.String())
+	}
+	st, err := store.Open(envs["KAASU_DATABASE_PATH"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	_ = st.Close()
 	out.Reset()
 	if code := run([]string{"doctor"}, getenv, &out, &errb); code != 0 || strings.Contains(out.String(), "FAIL") {
 		t.Errorf("healthy install: code=%d out=%q", code, out.String())
