@@ -1,5 +1,6 @@
 {
   "status.received": "பணம் கிடைத்தது",
+  "status.refunded": "திருப்பி அளிக்கப்பட்டது",
   "status.needs_ok": "உங்கள் ஒப்புதல் தேவை",
   "status.waiting": "காத்திருக்கிறது",
   "status.phone_offline": "தொலைபேசி இணைப்பில் இல்லை",

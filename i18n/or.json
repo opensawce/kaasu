@@ -1,5 +1,6 @@
 {
   "status.received": "Money received",
+  "status.refunded": "Refunded",
   "status.needs_ok": "Needs your OK",
   "status.waiting": "Waiting",
   "status.phone_offline": "Phone offline",

@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	"github.com/opensawce/kaasu/i18n"
+	"github.com/opensawce/kaasu/internal/accounts"
 	"github.com/opensawce/kaasu/internal/orders"
 )
 
@@ -21,6 +22,7 @@ var payTmpl = template.Must(template.ParseFS(assets, "templates/pay.html"))
 // Pay serves /pay/{id} and /pay/{id}/status.
 type Pay struct {
 	Orders   *orders.Service
+	Accounts *accounts.Service // optional: gives each order its receiving account's display name
 	ShopName string
 	ShopLang i18n.Lang
 }
@@ -74,8 +76,10 @@ type pageData struct {
 // stateWord maps an order state to the status shown. Nothing here says "failed": an unknown outcome is "waiting".
 func stateWord(l i18n.Lang, state string) string {
 	switch state {
-	case "confirmed", "late_paid", "refunded":
+	case "confirmed", "late_paid":
 		return i18n.T(l, "status.received")
+	case "refunded":
+		return i18n.T(l, "status.refunded")
 	case "review":
 		return i18n.T(l, "status.needs_ok")
 	case "expired", "cancelled", "rejected":
@@ -99,8 +103,14 @@ func (p *Pay) page(w http.ResponseWriter, r *http.Request) {
 		http.SetCookie(w, &http.Cookie{Name: "kaasu_lang", Value: string(l), Path: "/", SameSite: http.SameSiteLaxMode, MaxAge: 31536000})
 	}
 	amount := i18n.Rupees(o.AmountPaise, l)
+	shop := p.ShopName
+	if p.Accounts != nil {
+		if acc, err := p.Accounts.Get(r.Context(), o.AccountID); err == nil && acc.DisplayName != "" {
+			shop = acc.DisplayName
+		}
+	}
 	d := pageData{
-		Lang: string(l), Title: p.ShopName, Shop: p.ShopName, Amount: amount, AmountLabel: amount,
+		Lang: string(l), Title: shop, Shop: shop, Amount: amount, AmountLabel: amount,
 		Button: i18n.T(l, "pay.button", "amount", amount), UPILink: template.URL(o.UPILink),
 		WaitingTitle: i18n.T(l, "pay.waiting.title"), StepOpen: i18n.T(l, "pay.waiting.step_open"),
 		StepApprove: i18n.T(l, "pay.waiting.step_approve"), StepConfirm: i18n.T(l, "pay.waiting.step_confirm"),

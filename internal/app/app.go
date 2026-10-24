@@ -111,7 +111,7 @@ func New(cfg config.Config, key secrets.MasterKey, log *slog.Logger) (*App, erro
 		Matcher: match.New(st, clk, states.New(clk, pool.New(st, clk))),
 	}))
 	a.Server.Mount("public", "/v1/", api.New(api.Deps{Log: log, Orders: a.Orders, Vault: a.Vault}))
-	pay := &web.Pay{Orders: a.Orders, ShopName: "Kaasu", ShopLang: "en"}
+	pay := &web.Pay{Orders: a.Orders, Accounts: a.Accounts, ShopName: "Kaasu", ShopLang: "en"}
 	a.Server.Mount("public", "/pay/", pay.Handler())
 	a.Server.Mount("public", "/static/", pay.Handler())
 	return a, nil

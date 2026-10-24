@@ -178,3 +178,31 @@ func TestStaticAssetsServed(t *testing.T) {
 }
 
 var _ = i18n.Languages
+
+func TestPageShowsTheOrdersAccountDisplayName(t *testing.T) {
+	st := testutil.OpenStore(t)
+	clk := clock.NewFake(time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC))
+	ids := &testutil.Seq{}
+	accs := accounts.New(st, clk, ids)
+	ord := orders.New(st, clk, ids, accs)
+	ctx := context.Background()
+	if _, err := accs.Create(ctx, accounts.Input{VPA: "gupta.stores@okhdfcbank", Bank: "HDFC", DisplayName: "Gupta Stores"}); err != nil {
+		t.Fatal(err)
+	}
+	o, _, err := ord.Create(ctx, orders.CreateInput{AmountPaise: 10000, ExpiresIn: time.Hour}, "n1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := &Pay{Orders: ord, Accounts: accs, ShopName: "Kaasu", ShopLang: "en"}
+	rec := httptest.NewRecorder()
+	p.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/pay/"+o.ID, nil))
+	if body := rec.Body.String(); !strings.Contains(body, "Gupta Stores") {
+		t.Error("the receiving account's display name must be shown")
+	}
+}
+
+func TestRefundedHasItsOwnWord(t *testing.T) {
+	if stateWord("en", "refunded") == stateWord("en", "confirmed") {
+		t.Error("a refunded order must not say money received")
+	}
+}
