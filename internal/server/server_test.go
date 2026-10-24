@@ -118,3 +118,28 @@ func TestSecurityHeadersOnEveryListener(t *testing.T) {
 		}
 	}
 }
+
+func TestEveryListenerRateLimitsWithRetryAfter(t *testing.T) {
+	s := start(t)
+	a := s.Addrs()
+	for name, addr := range map[string]string{"public": a.Public, "ingest": a.Ingest, "admin": a.Admin} {
+		limited := false
+		for i := 0; i < 200 && !limited; i++ {
+			resp, err := http.Get("http://" + addr + "/healthz")
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp.Body.Close()
+			if resp.StatusCode == http.StatusTooManyRequests {
+				limited = resp.Header.Get("Retry-After") != ""
+				if !limited {
+					t.Errorf("%s: 429 without Retry-After", name)
+					break
+				}
+			}
+		}
+		if !limited {
+			t.Errorf("%s: no 429 after 200 quick requests", name)
+		}
+	}
+}
