@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -199,5 +200,32 @@ func TestAPIKeys(t *testing.T) {
 	}
 	if _, err := v.VerifyAPIKey(ctx, plain); err != ErrInvalidKey {
 		t.Errorf("revoked key must fail: %v", err)
+	}
+}
+
+func TestSecretAndKeyChangesAreLedgeredWithoutValues(t *testing.T) {
+	v := newVault(t, key(1))
+	ctx := context.Background()
+	_ = v.Put(ctx, "imap_password", []byte("hunter2"))
+	plain, rec, _ := v.NewAPIKey(ctx, "Woo")
+	_ = v.RevokeAPIKey(ctx, rec.ID)
+	_, _ = v.RotateAll(ctx, key(2))
+	rows, err := v.st.Read().Query(`SELECT kind, payload FROM ledger ORDER BY seq`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var kinds []string
+	for rows.Next() {
+		var k, p string
+		_ = rows.Scan(&k, &p)
+		kinds = append(kinds, k)
+		if strings.Contains(p, "hunter2") || strings.Contains(p, plain) {
+			t.Errorf("ledger payload leaks a secret: %s", p)
+		}
+	}
+	want := "[secret.updated apikey.created apikey.revoked secret.master_key_rotated]"
+	if fmt.Sprint(kinds) != want {
+		t.Errorf("kinds=%v want %s", kinds, want)
 	}
 }

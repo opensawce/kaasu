@@ -15,6 +15,7 @@ import (
 
 	"github.com/opensawce/kaasu/internal/clock"
 	"github.com/opensawce/kaasu/internal/id"
+	"github.com/opensawce/kaasu/internal/ledger"
 	"github.com/opensawce/kaasu/internal/store"
 )
 
@@ -52,7 +53,10 @@ func (v *Vault) Put(ctx context.Context, name string, plaintext []byte) error {
 	return v.st.Tx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `INSERT INTO secrets(name,blob,updated_at) VALUES(?,?,?)
 			ON CONFLICT(name) DO UPDATE SET blob=excluded.blob, updated_at=excluded.updated_at`, name, blob, v.now())
-		return err
+		if err != nil {
+			return err
+		}
+		return v.record(ctx, tx, "secret.updated", map[string]any{"name": name})
 	})
 }
 
@@ -105,7 +109,7 @@ func (v *Vault) RotateAll(ctx context.Context, next MasterKey) (int, error) {
 			}
 		}
 		count = len(all)
-		return nil
+		return v.record(ctx, tx, "secret.master_key_rotated", map[string]any{"secrets": count})
 	})
 	if err != nil {
 		return 0, err
@@ -139,7 +143,10 @@ func (v *Vault) NewAPIKey(ctx context.Context, label string) (string, APIKey, er
 	err := v.st.Tx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `INSERT INTO api_keys(id,label,prefix,key_hash,created_at) VALUES(?,?,?,?,?)`,
 			rec.ID, rec.Label, rec.Prefix, hashKey(plain), v.now())
-		return err
+		if err != nil {
+			return err
+		}
+		return v.record(ctx, tx, "apikey.created", map[string]any{"key_id": rec.ID, "label": label, "prefix": rec.Prefix})
 	})
 	if err != nil {
 		return "", APIKey{}, err
@@ -170,6 +177,12 @@ func (v *Vault) RevokeAPIKey(ctx context.Context, keyID string) error {
 		if n, _ := res.RowsAffected(); n == 0 {
 			return ErrInvalidKey
 		}
-		return nil
+		return v.record(ctx, tx, "apikey.revoked", map[string]any{"key_id": keyID})
 	})
+}
+
+// record ledgers an admin action. Payloads carry names and ids, never secret values.
+func (v *Vault) record(ctx context.Context, tx *sql.Tx, kind string, payload map[string]any) error {
+	_, err := ledger.Append(ctx, tx, v.clk, ledger.Entry{Kind: kind, Payload: payload})
+	return err
 }

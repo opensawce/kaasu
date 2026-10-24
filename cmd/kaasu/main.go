@@ -15,6 +15,7 @@ import (
 
 	"github.com/opensawce/kaasu/internal/clock"
 	"github.com/opensawce/kaasu/internal/config"
+	"github.com/opensawce/kaasu/internal/ledger"
 	"github.com/opensawce/kaasu/internal/secrets"
 	"github.com/opensawce/kaasu/internal/server"
 	"github.com/opensawce/kaasu/internal/store"
@@ -52,7 +53,9 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		return 0
 	case "rotate-key":
 		return rotateKey(getenv, stdout, stderr)
-	case "verify", "backup", "pair":
+	case "verify":
+		return verify(getenv, stdout, stderr)
+	case "backup", "pair":
 		fmt.Fprintf(stderr, "kaasu %s: not implemented yet\n", args[0])
 		return 1
 	default:
@@ -111,6 +114,35 @@ func rotateKey(getenv func(string) string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	fmt.Fprintf(stdout, "rotated %d secrets; now point KAASU_MASTER_KEY at the new key\n", n)
+	return 0
+}
+
+// verify walks the ledger hash chain and exits non-zero at the first broken row.
+func verify(getenv func(string) string, stdout, stderr io.Writer) int {
+	cfg, err := config.Load(getenv, getenv("KAASU_CONFIG"))
+	if err != nil {
+		fmt.Fprintln(stderr, "config:", err)
+		return 1
+	}
+	st, err := store.Open(cfg.DatabasePath)
+	if err != nil {
+		fmt.Fprintln(stderr, "open database:", err)
+		return 1
+	}
+	defer st.Close()
+	if err := st.Migrate(context.Background()); err != nil {
+		fmt.Fprintln(stderr, "migrate:", err)
+		return 1
+	}
+	res, err := ledger.Verify(context.Background(), st.Read())
+	if err != nil {
+		fmt.Fprintln(stderr, "verify:", err)
+		return 1
+	}
+	fmt.Fprintln(stdout, res.Describe())
+	if !res.OK {
+		return 1
+	}
 	return 0
 }
 

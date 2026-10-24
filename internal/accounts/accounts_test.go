@@ -4,10 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/opensawce/kaasu/internal/clock"
+	"github.com/opensawce/kaasu/internal/ledger"
 	"github.com/opensawce/kaasu/internal/testutil"
 )
 
@@ -108,5 +110,29 @@ func TestDeleteBlockedWhenOrdersExist(t *testing.T) {
 	b, _ := s.Create(ctx, Input{VPA: "b@okbank", Bank: "B", DisplayName: "B"})
 	if err := s.Delete(ctx, b.ID); err != nil {
 		t.Errorf("unused account should delete: %v", err)
+	}
+}
+
+func TestAdminChangesAreLedgered(t *testing.T) {
+	s := newSvc(t)
+	ctx := ledger.WithActor(context.Background(), "admin:priya")
+	a, _ := s.Create(ctx, Input{VPA: "a@okbank", Bank: "B", DisplayName: "A"})
+	_, _ = s.Update(ctx, a.ID, Input{VPA: "a@okbank", Bank: "B2", DisplayName: "A"})
+	_ = s.Deactivate(ctx, a.ID)
+	_ = s.Delete(ctx, a.ID)
+	rows, err := s.st.Read().Query(`SELECT kind, actor FROM ledger ORDER BY seq`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var got []string
+	for rows.Next() {
+		var k, a string
+		_ = rows.Scan(&k, &a)
+		got = append(got, k+"/"+a)
+	}
+	want := []string{"account.created/admin:priya", "account.updated/admin:priya", "account.deactivated/admin:priya", "account.deleted/admin:priya"}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("got %v want %v", got, want)
 	}
 }

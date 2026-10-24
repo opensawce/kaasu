@@ -33,7 +33,7 @@ SQLite in WAL mode, STRICT tables, foreign keys on, one writer (`BEGIN IMMEDIATE
 | `evidence`, `alerts` | raw alert bodies and parsed facts | unique raw hash, unique UTR |
 | `matches` | alert to order decisions | one match per alert |
 | `refunds` | refunds recorded against orders | foreign key to orders |
-| `ledger` | append-only hash chain | see ledger rules |
+| `ledger` | append-only hash chain: `hash = SHA-256(prev_hash, seq, ts, kind, order, actor, payload)`; triggers block UPDATE and DELETE; `kaasu verify` reports the first broken row; the chain detects edited rows but not removal of the newest rows unless the latest hash is kept outside the database (see the backup work) | triggers plus the chain |
 | `outbox` | webhook events waiting for delivery | unique event id |
 
 ### Deployment
