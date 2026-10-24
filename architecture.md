@@ -49,6 +49,8 @@ Headers: `X-Kaasu-Device`, `X-Kaasu-Timestamp`, `X-Kaasu-Nonce` (16 to 64 charac
 
 **Simulator and outbound guard (issue #51, partial).** `kaasu sim --list` names the ten payment scenarios with the state each should end in. `sim.Send` signs an alert with a device key and posts it through the real ingest handler, so development runs production code. `sim.CheckOutbound` refuses any call that leaves the machine (localhost is allowed).
 
+**Design tokens (issue #22, partial).** `assets/tokens.json` is the single source for colour, status words, spacing, radius and touch size. `go run ./scripts/gen-tokens` writes `internal/web/static/tokens.css`. Tests check the generated file matches the JSON, the app and the marketing site agree on every shared colour, every status has an icon and a word, icons sit on the 24 px grid, and every status pair meets WCAG AA.
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 
