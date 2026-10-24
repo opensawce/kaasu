@@ -41,21 +41,8 @@ func (p *Pool) Reserve(ctx context.Context, tx *sql.Tx, accountID, orderID strin
 	if _, err := tx.ExecContext(ctx, `DELETE FROM amount_reservations WHERE account_id = ? AND reserved_until <= ?`, accountID, ts(now)); err != nil {
 		return 0, fmt.Errorf("pool: sweep: %w", err)
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT amount_paise FROM amount_reservations WHERE account_id = ? AND amount_paise BETWEEN ? AND ?`,
-		accountID, basePaise, basePaise+slots-1)
+	taken, err := heldAmounts(ctx, tx, accountID, basePaise, basePaise+slots-1)
 	if err != nil {
-		return 0, fmt.Errorf("pool: read: %w", err)
-	}
-	taken := map[int64]bool{}
-	for rows.Next() {
-		var a int64
-		if err := rows.Scan(&a); err != nil {
-			rows.Close()
-			return 0, err
-		}
-		taken[a] = true
-	}
-	if err := rows.Close(); err != nil {
 		return 0, err
 	}
 	for amt := basePaise; amt < basePaise+slots; amt++ {
@@ -72,6 +59,26 @@ func (p *Pool) Reserve(ctx context.Context, tx *sql.Tx, accountID, orderID strin
 	return 0, ErrPoolFull
 }
 
+func heldAmounts(ctx context.Context, tx *sql.Tx, accountID string, lo, hi int64) (map[int64]bool, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT amount_paise FROM amount_reservations WHERE account_id = ? AND amount_paise BETWEEN ? AND ?`, accountID, lo, hi)
+	if err != nil {
+		return nil, fmt.Errorf("pool: read: %w", err)
+	}
+	defer rows.Close()
+	taken := map[int64]bool{}
+	for rows.Next() {
+		var a int64
+		if err := rows.Scan(&a); err != nil {
+			return nil, fmt.Errorf("pool: scan held amount: %w", err)
+		}
+		taken[a] = true
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("pool: read: %w", err)
+	}
+	return taken, nil
+}
+
 // Release frees the order's slot, if it has one.
 func (p *Pool) Release(ctx context.Context, tx *sql.Tx, orderID string) error {
 	if _, err := tx.ExecContext(ctx, `DELETE FROM amount_reservations WHERE order_id = ?`, orderID); err != nil {
@@ -86,29 +93,36 @@ type queued struct {
 	expiresAt time.Time
 }
 
-// PromoteQueued gives free slots to queued orders on the account, oldest first. Expired queued orders are skipped.
-func (p *Pool) PromoteQueued(ctx context.Context, tx *sql.Tx, accountID string) ([]string, error) {
-	now := p.clk.Now()
+func (p *Pool) queuedOrders(ctx context.Context, tx *sql.Tx, accountID string, now time.Time) ([]queued, error) {
 	rows, err := tx.QueryContext(ctx, `SELECT id, base_amount_paise, expires_at FROM orders
 		WHERE account_id = ? AND state = 'queued' AND expires_at > ? ORDER BY queued_at, id`, accountID, ts(now))
 	if err != nil {
 		return nil, fmt.Errorf("pool: queue: %w", err)
 	}
+	defer rows.Close()
 	var waiting []queued
 	for rows.Next() {
 		var q queued
 		var exp string
 		if err := rows.Scan(&q.id, &q.base, &exp); err != nil {
-			rows.Close()
-			return nil, err
+			return nil, fmt.Errorf("pool: scan queued order: %w", err)
 		}
 		if q.expiresAt, err = time.Parse(time.RFC3339, exp); err != nil {
-			rows.Close()
 			return nil, fmt.Errorf("pool: parse expiry: %w", err)
 		}
 		waiting = append(waiting, q)
 	}
-	if err := rows.Close(); err != nil {
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("pool: queue: %w", err)
+	}
+	return waiting, nil
+}
+
+// PromoteQueued gives free slots to queued orders on the account, oldest first. Expired queued orders are skipped.
+func (p *Pool) PromoteQueued(ctx context.Context, tx *sql.Tx, accountID string) ([]string, error) {
+	now := p.clk.Now()
+	waiting, err := p.queuedOrders(ctx, tx, accountID, now)
+	if err != nil {
 		return nil, err
 	}
 
@@ -116,7 +130,7 @@ func (p *Pool) PromoteQueued(ctx context.Context, tx *sql.Tx, accountID string) 
 	for _, q := range waiting {
 		amt, err := p.Reserve(ctx, tx, accountID, q.id, q.base, q.expiresAt)
 		if errors.Is(err, ErrPoolFull) {
-			break
+			continue // that base range is full; orders on other base amounts may still fit
 		}
 		if err != nil {
 			return promoted, err

@@ -177,6 +177,10 @@ func (s *Service) Create(ctx context.Context, in CreateInput, idemKey string) (O
 			VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, o.ID, o.AccountID, o.BaseAmountPaise, o.AmountPaise, o.State, nullable(o.Reference), nullable(o.Note), idemKey, hash, o.ExpiresAt, o.CreatedAt, o.UpdatedAt); err != nil {
 			return err
 		}
+		// Older queued orders get any free slots before this one, so the queue stays fair.
+		if _, err := s.pool.PromoteQueued(ctx, tx, acc.ID); err != nil {
+			return err
+		}
 		amt, err := s.pool.Reserve(ctx, tx, acc.ID, o.ID, in.AmountPaise, expires)
 		switch {
 		case errors.Is(err, pool.ErrPoolFull):
@@ -204,7 +208,9 @@ func (s *Service) Create(ctx context.Context, in CreateInput, idemKey string) (O
 	if err != nil {
 		return Order{}, false, err
 	}
-	o.UPILink = upi.Link(acc.VPA, acc.DisplayName, o.AmountPaise, o.Note)
+	if o.State == "awaiting" { // a queued order has no unique amount yet, so no link
+		o.UPILink = upi.Link(acc.VPA, acc.DisplayName, o.AmountPaise, o.Note)
+	}
 	return o, true, nil
 }
 
@@ -228,7 +234,9 @@ func scanOrder(r interface{ Scan(...any) error }) (Order, error) {
 		&o.ExpiresAt, &o.CreatedAt, &o.UpdatedAt, &o.ConfirmedAt, &vpa, &name); err != nil {
 		return Order{}, err
 	}
-	o.UPILink = upi.Link(vpa, name, o.AmountPaise, o.Note)
+	if o.State == "awaiting" {
+		o.UPILink = upi.Link(vpa, name, o.AmountPaise, o.Note)
+	}
 	return o, nil
 }
 
