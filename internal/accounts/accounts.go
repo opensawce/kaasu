@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/opensawce/kaasu/internal/clock"
 	"github.com/opensawce/kaasu/internal/store"
@@ -91,7 +90,7 @@ func (s *Service) Create(ctx context.Context, in Input) (Account, error) {
 		return Account{}, err
 	}
 	a := Account{ID: s.ids.New("acc"), VPA: in.VPA, Bank: in.Bank, DisplayName: in.DisplayName,
-		AutoConfirmLimitPaise: in.AutoConfirmLimitPaise, Active: true, CreatedAt: s.clk.Now().UTC().Format(time.RFC3339)}
+		AutoConfirmLimitPaise: in.AutoConfirmLimitPaise, Active: true, CreatedAt: s.clk.Now().UTC().Format("2006-01-02T15:04:05.000000Z")}
 	err := s.st.Tx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `INSERT INTO receiving_accounts(`+cols+`) VALUES(?,?,?,?,?,1,?)`,
 			a.ID, a.VPA, a.Bank, a.DisplayName, a.AutoConfirmLimitPaise, a.CreatedAt)
