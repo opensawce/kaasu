@@ -198,3 +198,27 @@ func TestEnrollmentURI(t *testing.T) {
 		t.Errorf("uri=%s err=%v", uri, err)
 	}
 }
+
+func TestReauthLocksAfterFiveBadCodes(t *testing.T) {
+	e := setup(t)
+	tok, _ := e.svc.Login(e.ctx, "priya", e.totp(e.clk.Now()))
+	e.clk.Advance(6 * time.Minute)
+	for i := 0; i < 5; i++ {
+		if err := e.svc.Reauth(e.ctx, tok, "000000"); !errors.Is(err, ErrBadLogin) {
+			t.Fatalf("attempt %d: %v", i, err)
+		}
+	}
+	if err := e.svc.Reauth(e.ctx, tok, e.totp(e.clk.Now())); !errors.Is(err, ErrLocked) {
+		t.Fatalf("a correct code must not get through while locked: %v", err)
+	}
+}
+
+func TestDuplicateAdminKeepsTheFirstSecret(t *testing.T) {
+	e := setup(t)
+	if id, err := e.svc.CreateAdmin(e.ctx, "priya", "staff", []byte("another-secret-20-by")); err == nil || id != "" {
+		t.Fatalf("duplicate name must fail with an empty id: %q %v", id, err)
+	}
+	if _, err := e.svc.Login(e.ctx, "priya", e.totp(e.clk.Now())); err != nil {
+		t.Fatalf("the original secret must still work: %v", err)
+	}
+}

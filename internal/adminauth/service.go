@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/opensawce/kaasu/internal/clock"
@@ -67,15 +68,23 @@ func (s *Service) CreateAdmin(ctx context.Context, name, role string, totpSecret
 		return "", fmt.Errorf("role must be owner or staff")
 	}
 	id := "adm_" + hashOf(name)[:12]
-	// The vault opens its own transaction, so it is written first, not inside this one.
-	if err := s.vault.Put(ctx, "totp."+id, totpSecret); err != nil {
-		return "", err
-	}
+	// The row goes in first, so a duplicate name fails before it can touch the existing person's secret.
+	// The vault opens its own transaction, so its write cannot sit inside this one.
 	err := s.st.Tx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `INSERT INTO admins(id, name, role, created_at) VALUES(?,?,?,?)`, id, name, role, s.now())
 		return err
 	})
-	return id, err
+	if err != nil {
+		return "", fmt.Errorf("create admin: %w", err)
+	}
+	if err := s.vault.Put(ctx, "totp."+id, totpSecret); err != nil {
+		derr := s.st.Tx(ctx, func(tx *sql.Tx) error {
+			_, err := tx.ExecContext(ctx, `DELETE FROM admins WHERE id = ?`, id)
+			return err
+		})
+		return "", errors.Join(fmt.Errorf("store totp secret: %w", err), derr)
+	}
+	return id, nil
 }
 
 // Enroll returns the otpauth:// link an authenticator app scans.
@@ -89,7 +98,7 @@ func (s *Service) Enroll(ctx context.Context, name string) (string, error) {
 		return "", err
 	}
 	enc := base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(secret)
-	return "otpauth://totp/Kaasu:" + name + "?secret=" + enc + "&issuer=Kaasu&digits=6&period=30", nil
+	return "otpauth://totp/Kaasu:" + url.PathEscape(name) + "?secret=" + enc + "&issuer=Kaasu&digits=6&period=30", nil
 }
 
 func (s *Service) byName(ctx context.Context, name string) (Admin, error) {
@@ -120,14 +129,19 @@ func (s *Service) checkCode(ctx context.Context, tx *sql.Tx, a Admin, code strin
 }
 
 // lockedUntil reports an active lock for a key.
-func (s *Service) lockedUntil(ctx context.Context, key string) (bool, error) {
+func (s *Service) lockedUntil(ctx context.Context, q interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}, key string) (bool, error) {
 	var until sql.NullString
-	err := s.st.Read().QueryRowContext(ctx, `SELECT locked_until FROM auth_failures WHERE key = ?`, key).Scan(&until)
-	if errors.Is(err, sql.ErrNoRows) || !until.Valid {
+	err := q.QueryRowContext(ctx, `SELECT locked_until FROM auth_failures WHERE key = ?`, key).Scan(&until)
+	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
 	if err != nil {
 		return false, err
+	}
+	if !until.Valid {
+		return false, nil
 	}
 	t, _ := time.Parse(time.RFC3339, until.String)
 	return s.clk.Now().Before(t), nil
@@ -136,16 +150,17 @@ func (s *Service) lockedUntil(ctx context.Context, key string) (bool, error) {
 // Login checks name and code and returns a new session token. Unknown names and wrong codes get the same reply.
 func (s *Service) Login(ctx context.Context, name, code string) (string, error) {
 	key := "login:" + name
-	locked, err := s.lockedUntil(ctx, key)
-	if err != nil {
-		return "", err
-	}
-	if locked {
-		return "", ErrLocked
-	}
 	var token string
 	ok := false
-	err = s.st.Tx(ctx, func(tx *sql.Tx) error {
+	err := s.st.Tx(ctx, func(tx *sql.Tx) error {
+		// Checked inside the writer, so two parallel guesses cannot both slip past a lock that is about to be set.
+		locked, err := s.lockedUntil(ctx, tx, key)
+		if err != nil {
+			return err
+		}
+		if locked {
+			return ErrLocked
+		}
 		a, err := s.byName(ctx, name)
 		if err == nil {
 			err = s.checkCode(ctx, tx, a, code)
@@ -257,14 +272,37 @@ func (s *Service) Reauth(ctx context.Context, token, code string) error {
 	if err != nil {
 		return err
 	}
-	return s.st.Tx(ctx, func(tx *sql.Tx) error {
-		if err := s.checkCode(ctx, tx, a, code); err != nil {
+	key := "reauth:" + a.ID
+	bad := false
+	err = s.st.Tx(ctx, func(tx *sql.Tx) error {
+		locked, err := s.lockedUntil(ctx, tx, key)
+		if err != nil {
 			return err
 		}
-		_, err := tx.ExecContext(ctx, `UPDATE sessions SET fresh_until = ? WHERE id_hash = ?`,
+		if locked {
+			return ErrLocked
+		}
+		if err := s.checkCode(ctx, tx, a, code); err != nil {
+			if !errors.Is(err, ErrBadLogin) {
+				return err
+			}
+			bad = true
+			return s.failure(ctx, tx, key) // commits the count; the bad-code error is returned after
+		}
+		if err := s.clearFailures(ctx, tx, key); err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, `UPDATE sessions SET fresh_until = ? WHERE id_hash = ?`,
 			s.clk.Now().Add(freshTTL).UTC().Format(time.RFC3339), hashOf(token))
 		return err
 	})
+	if err != nil {
+		return err
+	}
+	if bad {
+		return ErrBadLogin
+	}
+	return nil
 }
 
 func (s *Service) csrfFor(token string) string {

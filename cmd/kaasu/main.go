@@ -186,12 +186,17 @@ func openApp(getenv func(string) string, stderr io.Writer, quiet bool) (*app.App
 
 // admin init creates an admin with a fresh TOTP secret and prints the authenticator link once.
 func admin(args []string, getenv func(string) string, stdout, stderr io.Writer) int {
-	if len(args) < 3 || args[0] != "init" || args[1] != "--name" {
-		fmt.Fprintln(stderr, "usage: kaasu admin init --name <name> [--role owner|staff]")
+	const usage = "usage: kaasu admin init --name <name> [--role owner|staff]"
+	if len(args) < 3 || args[0] != "init" || args[1] != "--name" || args[2] == "" || (len(args) != 3 && len(args) != 5) {
+		fmt.Fprintln(stderr, usage)
 		return 2
 	}
 	name, role := args[2], "owner"
-	if len(args) >= 5 && args[3] == "--role" {
+	if len(args) == 5 {
+		if args[3] != "--role" || (args[4] != "owner" && args[4] != "staff") {
+			fmt.Fprintln(stderr, usage)
+			return 2
+		}
 		role = args[4]
 	}
 	a, _, ok := openApp(getenv, stderr, true)
