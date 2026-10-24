@@ -1,5 +1,5 @@
 # CodeRabbit review rules for Kaasu. Source of truth for review behaviour; AGENTS.md holds the project rules.
-language: en-IN
+language: en-GB
 early_access: false
 
 reviews:
@@ -15,16 +15,12 @@ reviews:
     enabled: true
     drafts: false
     auto_incremental_review: true
+    auto_pause_after_reviewed_commits: 0
     base_branches:
-      - main
-      - feat/.*
-      - web/.*
-      - chore/.*
-      - fix/.*
+      - ".*"
 
   path_filters:
     - "!**/*.golden"
-    - "!**/testdata/**"
     - "!**/*.lock"
     - "!**/package-lock.json"
     - "!**/go.sum"
