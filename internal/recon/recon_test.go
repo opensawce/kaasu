@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -14,10 +16,24 @@ import (
 	"github.com/opensawce/kaasu/internal/orders"
 	"github.com/opensawce/kaasu/internal/pool"
 	"github.com/opensawce/kaasu/internal/states"
+	"github.com/opensawce/kaasu/internal/store"
 	"github.com/opensawce/kaasu/internal/testutil"
 )
 
 var t0 = time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+
+var acctSeq atomic.Int64
+
+// mkAccount creates a receiving account for statements to belong to.
+func mkAccount(t testing.TB, st *store.Store) string {
+	t.Helper()
+	clk := clock.NewFake(t0)
+	acc, err := accounts.New(st, clk, &testutil.Seq{}).Create(context.Background(), accounts.Input{VPA: fmt.Sprintf("shop%d@okbank", acctSeq.Add(1)), Bank: "B", DisplayName: "Shop"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return acc.ID
+}
 
 func TestParsePaiseInIntegerMaths(t *testing.T) {
 	for in, want := range map[string]int64{"499.07": 49907, "1,25,000.50": 12500050, "5": 500, "": 0} {
@@ -39,12 +55,13 @@ func TestParsePaiseInIntegerMaths(t *testing.T) {
 
 func TestImportHDFCFixture(t *testing.T) {
 	st := testutil.OpenStore(t)
+	accID := mkAccount(t, st)
 	raw, _ := os.ReadFile("testdata/hdfc.csv")
 	var batch string
 	var rows int
 	err := st.Tx(context.Background(), func(tx *sql.Tx) error {
 		var err error
-		batch, rows, err = ImportCSV(context.Background(), tx, bytes.NewReader(raw), hdfcMapping())
+		batch, rows, err = ImportCSV(context.Background(), tx, bytes.NewReader(raw), hdfcMapping(), accID)
 		return err
 	})
 	if err != nil || rows != 3 || batch == "" {
@@ -59,10 +76,11 @@ func TestImportHDFCFixture(t *testing.T) {
 
 func TestDuplicateImportIsIdempotent(t *testing.T) {
 	st := testutil.OpenStore(t)
+	accID := mkAccount(t, st)
 	raw, _ := os.ReadFile("testdata/hdfc.csv")
 	for i := 0; i < 2; i++ {
 		_ = st.Tx(context.Background(), func(tx *sql.Tx) error {
-			_, _, err := ImportCSV(context.Background(), tx, bytes.NewReader(raw), hdfcMapping())
+			_, _, err := ImportCSV(context.Background(), tx, bytes.NewReader(raw), hdfcMapping(), accID)
 			return err
 		})
 	}
@@ -75,9 +93,10 @@ func TestDuplicateImportIsIdempotent(t *testing.T) {
 
 func TestHugeFileRejected(t *testing.T) {
 	st := testutil.OpenStore(t)
+	accID := mkAccount(t, st)
 	big := strings.Repeat("a,b,c,d,e\n", (10<<20)/10+10)
 	err := st.Tx(context.Background(), func(tx *sql.Tx) error {
-		_, _, err := ImportCSV(context.Background(), tx, strings.NewReader(big), hdfcMapping())
+		_, _, err := ImportCSV(context.Background(), tx, strings.NewReader(big), hdfcMapping(), accID)
 		return err
 	})
 	if err == nil {
@@ -113,7 +132,7 @@ func TestBuckets(t *testing.T) {
 	}
 	raw, _ := os.ReadFile("testdata/hdfc.csv")
 	_ = st.Tx(ctx, func(tx *sql.Tx) error {
-		_, _, err := ImportCSV(ctx, tx, bytes.NewReader(raw), hdfcMapping())
+		_, _, err := ImportCSV(ctx, tx, bytes.NewReader(raw), hdfcMapping(), acc.ID)
 		return err
 	})
 	svc := New(st, sm, ids)
@@ -144,4 +163,54 @@ func TestBuckets(t *testing.T) {
 func hdfcMapping() Mapping {
 	m, _ := MappingFor("hdfc")
 	return m
+}
+
+func TestShortRecordIsAnImportErrorNotAPanic(t *testing.T) {
+	st := testutil.OpenStore(t)
+	accID := mkAccount(t, st)
+	short := "Date,Narration,Withdrawal Amt.,Deposit Amt.,Reference No.\n23/10/2026,x,,1.00\n"
+	err := st.Tx(context.Background(), func(tx *sql.Tx) error {
+		_, _, err := ImportCSV(context.Background(), tx, strings.NewReader(short), hdfcMapping(), accID)
+		return err
+	})
+	if err == nil {
+		t.Fatal("a record with too few columns must fail the import")
+	}
+}
+
+func TestCreditsOnlyMatchOrdersOfTheSameAccount(t *testing.T) {
+	st := testutil.OpenStore(t)
+	clk := clock.NewFake(t0)
+	ids := &testutil.Seq{}
+	accs := accounts.New(st, clk, ids)
+	ord := orders.New(st, clk, ids, accs)
+	sm := states.New(clk, pool.New(st, clk))
+	ctx := context.Background()
+	a1, _ := accs.Create(ctx, accounts.Input{VPA: "one@okbank", Bank: "B", DisplayName: "One"})
+	a2, _ := accs.Create(ctx, accounts.Input{VPA: "two@okbank", Bank: "B", DisplayName: "Two"})
+	o, _, _ := ord.Create(ctx, orders.CreateInput{AmountPaise: 49907, AccountID: a1.ID, ExpiresIn: time.Hour}, "x1")
+	if err := st.Tx(ctx, func(tx *sql.Tx) error {
+		if _, err := sm.Transition(ctx, tx, o.ID, "matched", nil); err != nil {
+			return err
+		}
+		_, err := sm.Transition(ctx, tx, o.ID, "confirmed", nil)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile("testdata/hdfc.csv")
+	// The statement belongs to the other account, so its 499.07 credit must not prove this order.
+	if err := st.Tx(ctx, func(tx *sql.Tx) error {
+		_, _, err := ImportCSV(ctx, tx, bytes.NewReader(raw), hdfcMapping(), a2.ID)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	rep, err := New(st, sm, ids).Reconcile(ctx, t0.Add(-time.Hour), t0.Add(48*time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.Matched) != 0 || len(rep.ConfirmedButMissing) != 1 {
+		t.Errorf("matched=%v missing=%v", rep.Matched, rep.ConfirmedButMissing)
+	}
 }

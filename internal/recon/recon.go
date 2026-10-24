@@ -53,7 +53,10 @@ func paise(s string) (int64, error) {
 }
 
 // ImportCSV stores a statement. Importing the same file twice stores it once.
-func ImportCSV(ctx context.Context, tx *sql.Tx, r io.Reader, m Mapping) (string, int, error) {
+func ImportCSV(ctx context.Context, tx *sql.Tx, r io.Reader, m Mapping, accountID string) (string, int, error) {
+	if accountID == "" {
+		return "", 0, errors.New("statement needs the receiving account it belongs to")
+	}
 	data, err := io.ReadAll(io.LimitReader(r, maxFileBytes+1))
 	if err != nil {
 		return "", 0, err
@@ -63,9 +66,10 @@ func ImportCSV(ctx context.Context, tx *sql.Tx, r io.Reader, m Mapping) (string,
 	}
 	sum := sha256.Sum256(data)
 	fileHash := hex.EncodeToString(sum[:])
-	batch := "bat_" + fileHash[:16]
+	scoped := sha256.Sum256([]byte(accountID + "|" + fileHash)) // the same file for another account is a different batch
+	batch := "bat_" + hex.EncodeToString(scoped[:])[:16]
 	var existing string
-	err = tx.QueryRowContext(ctx, `SELECT id FROM statement_batches WHERE file_hash = ?`, fileHash).Scan(&existing)
+	err = tx.QueryRowContext(ctx, `SELECT id FROM statement_batches WHERE account_id = ? AND file_hash = ?`, accountID, fileHash).Scan(&existing)
 	if err == nil {
 		return existing, 0, nil
 	}
@@ -85,10 +89,13 @@ func ImportCSV(ctx context.Context, tx *sql.Tx, r io.Reader, m Mapping) (string,
 	for i, h := range header {
 		idx[strings.TrimSpace(h)] = i
 	}
+	need := -1
 	for _, col := range []string{m.DateCol, m.DescCol, m.CreditCol, m.DebitCol, m.UTRCol} {
-		if _, ok := idx[col]; !ok {
+		i, ok := idx[col]
+		if !ok {
 			return "", 0, fmt.Errorf("statement has no %q column", col)
 		}
+		need = max(need, i)
 	}
 	rows := 0
 	for n := 1; ; n++ {
@@ -101,6 +108,9 @@ func ImportCSV(ctx context.Context, tx *sql.Tx, r io.Reader, m Mapping) (string,
 		}
 		if rows >= maxRows {
 			return "", 0, errors.New("statement has too many rows")
+		}
+		if len(rec) <= need {
+			return "", 0, fmt.Errorf("row %d: has %d columns, need at least %d", n, len(rec), need+1)
 		}
 		cell := func(col string) string { return rec[idx[col]] }
 		when, err := time.Parse(m.DateLayout, strings.TrimSpace(cell(m.DateCol)))
@@ -130,8 +140,8 @@ func ImportCSV(ctx context.Context, tx *sql.Tx, r io.Reader, m Mapping) (string,
 		}
 		rows++
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO statement_batches(id, file_hash, rows, imported_at) VALUES(?,?,?,?)`,
-		batch, fileHash, rows, time.Now().UTC().Format(time.RFC3339)); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO statement_batches(id, account_id, file_hash, rows, imported_at) VALUES(?,?,?,?,?)`,
+		batch, accountID, fileHash, rows, time.Now().UTC().Format(time.RFC3339)); err != nil {
 		return "", 0, err
 	}
 	return batch, rows, nil
@@ -178,8 +188,8 @@ func New(st *store.Store, sm *states.Machine, ids IDSource) *Service {
 }
 
 type credit struct {
-	id, utr string
-	paise   int64
+	id, utr, account string
+	paise            int64
 }
 
 // Reconcile compares confirmed orders in [from, to) with the imported statement. It is read-only.
@@ -187,73 +197,95 @@ func (s *Service) Reconcile(ctx context.Context, from, to time.Time) (Report, er
 	var rep Report
 	credits := map[string]credit{} // by statement id
 	used := map[string]bool{}
-	rows, err := s.st.Read().QueryContext(ctx, `SELECT id, COALESCE(utr,''), credit_paise FROM statement_rows WHERE credit_paise > 0`)
+	rows, err := s.st.Read().QueryContext(ctx, `SELECT r.id, COALESCE(r.utr,''), b.account_id, r.credit_paise
+		FROM statement_rows r JOIN statement_batches b ON b.id = r.batch_id WHERE r.credit_paise > 0 ORDER BY r.id`)
 	if err != nil {
 		return rep, err
 	}
 	var all []credit
 	for rows.Next() {
 		var c credit
-		if err := rows.Scan(&c.id, &c.utr, &c.paise); err != nil {
+		if err := rows.Scan(&c.id, &c.utr, &c.account, &c.paise); err != nil {
 			rows.Close()
 			return rep, err
 		}
 		credits[c.id] = c
 		all = append(all, c)
 	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return rep, fmt.Errorf("recon: read statement credits: %w", err)
+	}
 	if err := rows.Close(); err != nil {
 		return rep, err
 	}
-	orders, err := s.st.Read().QueryContext(ctx, `SELECT o.id, o.amount_paise, COALESCE(a.utr,''), o.confirmed_at
+	orders, err := s.st.Read().QueryContext(ctx, `SELECT o.id, o.account_id, o.amount_paise, COALESCE(a.utr,''), o.confirmed_at
 		FROM orders o LEFT JOIN (SELECT m.order_id, al.utr FROM matches m JOIN alerts al ON al.id = m.alert_id WHERE m.decision = 'auto') a ON a.order_id = o.id
 		WHERE o.state IN ('confirmed','late_paid','refunded','disputed') AND o.confirmed_at <> ''`)
 	if err != nil {
 		return rep, err
 	}
 	type paid struct {
-		id, utr, at string
-		paise       int64
+		id, account, utr, at string
+		paise                int64
 	}
 	var ps []paid
 	for orders.Next() {
 		var p paid
-		if err := orders.Scan(&p.id, &p.paise, &p.utr, &p.at); err != nil {
+		if err := orders.Scan(&p.id, &p.account, &p.paise, &p.utr, &p.at); err != nil {
 			orders.Close()
 			return rep, err
 		}
 		ps = append(ps, p)
 	}
+	if err := orders.Err(); err != nil {
+		orders.Close()
+		return rep, fmt.Errorf("recon: read confirmed orders: %w", err)
+	}
 	if err := orders.Close(); err != nil {
 		return rep, err
 	}
+	var inRange []paid
 	for _, p := range ps {
-		at, err := time.Parse(time.RFC3339, p.at)
-		if err != nil || at.Before(from) || !at.Before(to) {
+		if at, err := time.Parse(time.RFC3339, p.at); err == nil && !at.Before(from) && at.Before(to) {
+			inRange = append(inRange, p)
+		}
+	}
+	// Credits only match orders of the same receiving account.
+	// Pass 1 claims credits by UTR, so no amount fallback can take a credit that belongs to a UTR match.
+	foundBy := map[string]string{}
+	for _, p := range inRange {
+		if p.utr == "" {
 			continue
 		}
-		found := ""
-		if p.utr != "" {
-			for _, c := range all {
-				if !used[c.id] && c.utr == p.utr {
-					found = c.id
-					break
-				}
+		for _, c := range all {
+			if !used[c.id] && c.account == p.account && c.utr == p.utr {
+				used[c.id] = true
+				foundBy[p.id] = c.id
+				break
 			}
 		}
-		if found == "" {
-			// No UTR matched: fall back to an unused credit of the exact amount.
-			for _, c := range all {
-				if !used[c.id] && c.paise == p.paise {
-					found = c.id
-					break
-				}
+	}
+	// Pass 2: exact amount. An order that has a UTR may only use a credit that carries none, since a credit with
+	// another UTR is a different payment.
+	for _, p := range inRange {
+		if foundBy[p.id] != "" {
+			continue
+		}
+		for _, c := range all {
+			if !used[c.id] && c.account == p.account && c.paise == p.paise && (p.utr == "" || c.utr == "") {
+				used[c.id] = true
+				foundBy[p.id] = c.id
+				break
 			}
 		}
+	}
+	for _, p := range inRange {
+		found := foundBy[p.id]
 		if found == "" {
 			rep.ConfirmedButMissing = append(rep.ConfirmedButMissing, p.id)
 			continue
 		}
-		used[found] = true
 		c := credits[found]
 		if c.paise != p.paise {
 			rep.AmountMismatch = append(rep.AmountMismatch, Pair{OrderID: p.id, StatementID: found, AmountPaise: c.paise})
