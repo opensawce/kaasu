@@ -61,6 +61,11 @@ func Append(ctx context.Context, tx *sql.Tx, clk clock.Clock, e Entry) (int64, e
 	if actor == "" {
 		actor = actorFrom(ctx)
 	}
+	for _, f := range []string{e.Kind, e.OrderID, actor} {
+		if strings.ContainsRune(f, 0x1f) {
+			return 0, errors.New("ledger: field contains the hash separator byte")
+		}
+	}
 	payload := "{}"
 	if len(e.Payload) > 0 {
 		b, err := json.Marshal(e.Payload) // map keys are sorted, so the text is stable
