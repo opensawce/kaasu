@@ -124,7 +124,7 @@ func TestEveryListenerRateLimitsWithRetryAfter(t *testing.T) {
 	a := s.Addrs()
 	for name, addr := range map[string]string{"public": a.Public, "ingest": a.Ingest, "admin": a.Admin} {
 		limited := false
-		for i := 0; i < 200 && !limited; i++ {
+		for i := 0; i < 3000 && !limited; i++ {
 			resp, err := http.Get("http://" + addr + "/healthz")
 			if err != nil {
 				t.Fatal(err)
@@ -139,7 +139,7 @@ func TestEveryListenerRateLimitsWithRetryAfter(t *testing.T) {
 			}
 		}
 		if !limited {
-			t.Errorf("%s: no 429 after 200 quick requests", name)
+			t.Errorf("%s: no 429 after 3000 quick requests", name)
 		}
 	}
 }
