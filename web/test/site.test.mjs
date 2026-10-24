@@ -128,6 +128,7 @@ test('motion respects reduced-motion preference', () => {
 test('legal drafts carry the draft banner', () => {
   for (const f of ['bank-terms.md', 'privacy.md']) {
     const body = readFileSync(join(root, 'src/content/docs/docs/reference/', f), 'utf8');
-    assert.ok(body.includes('Draft'), `${f} needs the draft banner`);
+    const content = body.replace(/^---\n[\s\S]*?\n---\n/, '').trimStart();
+    assert.match(content.split('\n')[0], /^> \*\*Draft/, `${f} needs the draft banner as its first line`);
   }
 });

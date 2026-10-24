@@ -20,7 +20,7 @@ You choose how long evidence is kept. Ledger rows are kept so the chain stays ve
 You can see, export and delete the data your instance holds. Deleting ledger rows is not possible by design; the chain would break.
 
 ## AI features (off by default)
-When you enable an AI provider with your own key, only masked text is sent: account numbers and VPAs are replaced before any call. The provider's own terms apply to what it receives.
+AI provider integration is planned and is not part of this version: nothing is sent to any AI provider today. When it ships, it will be off by default, and account numbers and VPAs will be replaced (masked) before any text is sent. The provider's own terms will apply to what it receives.
 
 ## Children
 Kaasu is for businesses and is not directed at children.
