@@ -51,7 +51,7 @@ func New(cfg config.Config, key secrets.MasterKey, log *slog.Logger) (*App, erro
 	a.Accounts = accounts.New(st, clk, ids)
 	a.Orders = orders.New(st, clk, ids, a.Accounts)
 	a.Server = server.New(cfg, log)
-	a.Server.Mount("public", "/v1/", api.New(api.Deps{Orders: a.Orders, Vault: a.Vault}))
+	a.Server.Mount("public", "/v1/", api.New(api.Deps{Log: log, Orders: a.Orders, Vault: a.Vault}))
 	return a, nil
 }
 

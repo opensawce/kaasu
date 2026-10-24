@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -19,6 +20,7 @@ const maxBody = 64 << 10
 
 // Deps are the services the API needs.
 type Deps struct {
+	Log    *slog.Logger
 	Orders *orders.Service
 	Vault  *secrets.Vault
 }
@@ -130,12 +132,16 @@ func (s *server) createOrder(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
+	if req.ExpiresInSeconds < 0 || req.ExpiresInSeconds > 86400 {
+		fail(w, http.StatusBadRequest, "invalid_request", "expires_in_seconds must be between 60 and 86400")
+		return
+	}
 	o, created, err := s.Orders.Create(r.Context(), orders.CreateInput{
 		AmountPaise: req.AmountPaise, AccountID: req.AccountID, Reference: req.Reference, Note: req.Note,
 		ExpiresIn: time.Duration(req.ExpiresInSeconds) * time.Second,
 	}, r.Header.Get("Idempotency-Key"))
 	if err != nil {
-		s.orderError(w, err)
+		s.orderError(w, r, err)
 		return
 	}
 	status := http.StatusCreated
@@ -149,7 +155,7 @@ func (s *server) createOrder(w http.ResponseWriter, r *http.Request) {
 func (s *server) getOrder(w http.ResponseWriter, r *http.Request) {
 	o, err := s.Orders.Get(r.Context(), r.PathValue("id"))
 	if err != nil {
-		s.orderError(w, err)
+		s.orderError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, toJSON(o))
@@ -158,13 +164,13 @@ func (s *server) getOrder(w http.ResponseWriter, r *http.Request) {
 func (s *server) cancelOrder(w http.ResponseWriter, r *http.Request) {
 	o, err := s.Orders.Cancel(r.Context(), r.PathValue("id"))
 	if err != nil {
-		s.orderError(w, err)
+		s.orderError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, toJSON(o))
 }
 
-func (s *server) orderError(w http.ResponseWriter, err error) {
+func (s *server) orderError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, orders.ErrInvalid):
 		fail(w, http.StatusBadRequest, "invalid_request", err.Error())
@@ -177,6 +183,9 @@ func (s *server) orderError(w http.ResponseWriter, err error) {
 	case errors.Is(err, context.Canceled):
 		fail(w, 499, "canceled", "request canceled")
 	default:
+		if s.Log != nil {
+			s.Log.ErrorContext(r.Context(), "order request failed", "method", r.Method, "path", r.URL.Path, "err", err)
+		}
 		fail(w, http.StatusInternalServerError, "internal", "something went wrong; the details are in the server log")
 	}
 }

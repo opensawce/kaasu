@@ -45,7 +45,7 @@ func setup(t *testing.T) fixture {
 
 func (f fixture) do(t *testing.T, method, path, key, idem, body string) (*http.Response, map[string]any) {
 	t.Helper()
-	req, _ := http.NewRequest(method, f.srv.URL+path, strings.NewReader(body))
+	req, _ := http.NewRequestWithContext(t.Context(), method, f.srv.URL+path, strings.NewReader(body))
 	if key != "" {
 		req.Header.Set("Authorization", "Bearer "+key)
 	}

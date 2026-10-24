@@ -39,7 +39,7 @@ func TestEndToEndOrderOverHTTP(t *testing.T) {
 	})
 	addrs := a.Server.Addrs()
 
-	req, _ := http.NewRequest("POST", "http://"+addrs.Public+"/v1/orders", strings.NewReader(`{"amount_paise":49900}`))
+	req, _ := http.NewRequestWithContext(ctx, "POST", "http://"+addrs.Public+"/v1/orders", strings.NewReader(`{"amount_paise":49900}`))
 	req.Header.Set("Authorization", "Bearer "+key)
 	req.Header.Set("Idempotency-Key", "k1")
 	resp, err := http.DefaultClient.Do(req)
@@ -52,7 +52,9 @@ func TestEndToEndOrderOverHTTP(t *testing.T) {
 	}
 	// The API is on the public listener only.
 	for name, addr := range map[string]string{"ingest": addrs.Ingest, "admin": addrs.Admin} {
-		r, err := http.Post("http://"+addr+"/v1/orders", "application/json", strings.NewReader(`{}`))
+		pr, _ := http.NewRequestWithContext(ctx, "POST", "http://"+addr+"/v1/orders", strings.NewReader(`{}`))
+		pr.Header.Set("Content-Type", "application/json")
+		r, err := http.DefaultClient.Do(pr)
 		if err != nil {
 			t.Fatal(err)
 		}

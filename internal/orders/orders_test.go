@@ -137,7 +137,7 @@ func TestOrderLifecycleIsLedgered(t *testing.T) {
 	ctx := ledgerActor(e.ctx, "api:key_1")
 	o, _, _ := e.svc.Create(ctx, CreateInput{AmountPaise: 100}, "k")
 	_, _ = e.svc.Cancel(ctx, o.ID)
-	rows, err := e.svc.st.Read().Query(`SELECT kind, actor, order_id FROM ledger WHERE order_id IS NOT NULL ORDER BY seq`)
+	rows, err := e.svc.st.Read().QueryContext(e.ctx, `SELECT kind, actor, order_id FROM ledger WHERE order_id IS NOT NULL ORDER BY seq`)
 	if err != nil {
 		t.Fatal(err)
 	}

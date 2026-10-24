@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"os"
 	"os/signal"
 	"syscall"
@@ -153,7 +154,8 @@ func verify(getenv func(string) string, stdout, stderr io.Writer) int {
 }
 
 // openApp loads config and the master key, then builds the app (no listeners yet).
-func openApp(getenv func(string) string, stderr io.Writer) (*app.App, *slog.Logger, bool) {
+// openApp reports failures on stderr; quiet also silences the startup log lines.
+func openApp(getenv func(string) string, stderr io.Writer, quiet bool) (*app.App, *slog.Logger, bool) {
 	cfg, err := config.Load(getenv, getenv("KAASU_CONFIG"))
 	if err != nil {
 		fmt.Fprintln(stderr, "config:", err)
@@ -166,7 +168,11 @@ func openApp(getenv func(string) string, stderr io.Writer) (*app.App, *slog.Logg
 	}
 	var level slog.Level
 	_ = level.UnmarshalText([]byte(cfg.LogLevel))
-	log := slog.New(slog.NewJSONHandler(stderr, &slog.HandlerOptions{Level: level}))
+	var logw io.Writer = stderr
+	if quiet {
+		logw = io.Discard
+	}
+	log := slog.New(slog.NewJSONHandler(logw, &slog.HandlerOptions{Level: level}))
 	log.Info("master key loaded", "source", source)
 	a, err := app.New(cfg, key, log)
 	if err != nil {
@@ -188,12 +194,15 @@ func account(args []string, getenv func(string) string, stdout, stderr io.Writer
 	if err := fs.Parse(args[1:]); err != nil {
 		return 2
 	}
-	a, _, ok := openApp(getenv, io.Discard)
+	a, _, ok := openApp(getenv, stderr, true)
 	if !ok {
-		fmt.Fprintln(stderr, "could not open Kaasu: check KAASU_MASTER_KEY and the database path")
 		return 1
 	}
 	defer a.Store.Close()
+	if *limit < 0 || *limit > math.MaxInt64/100 {
+		fmt.Fprintln(stderr, "account add: --limit-rupees must be between 0 and", int64(math.MaxInt64/100))
+		return 2
+	}
 	acc, err := a.Accounts.Create(ledger.WithActor(context.Background(), "cli"), accounts.Input{VPA: *vpa, Bank: *bank, DisplayName: *name, AutoConfirmLimitPaise: *limit * 100})
 	if err != nil {
 		fmt.Fprintln(stderr, "account add:", err)
@@ -208,9 +217,8 @@ func apikey(args []string, getenv func(string) string, stdout, stderr io.Writer)
 		fmt.Fprintln(stderr, "usage: kaasu apikey new <label>")
 		return 2
 	}
-	a, _, ok := openApp(getenv, io.Discard)
+	a, _, ok := openApp(getenv, stderr, true)
 	if !ok {
-		fmt.Fprintln(stderr, "could not open Kaasu: check KAASU_MASTER_KEY and the database path")
 		return 1
 	}
 	defer a.Store.Close()
@@ -228,7 +236,7 @@ func serve(args []string, getenv func(string) string, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "serve: unexpected arguments %q (configure with KAASU_CONFIG or KAASU_* env)\n", args)
 		return 2
 	}
-	a, log, ok := openApp(getenv, stderr)
+	a, log, ok := openApp(getenv, stderr, false)
 	if !ok {
 		return 1
 	}
