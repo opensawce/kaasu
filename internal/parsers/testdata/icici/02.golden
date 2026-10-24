@@ -1,0 +1,9 @@
+{
+  "Bank": "ICICI",
+  "AmountPaise": 10000000,
+  "UTR": "300000000003",
+  "PayerMasked": "bu***@ybl",
+  "AccountHint": "234",
+  "OccurredAt": "2027-03-04T18:30:00Z",
+  "Parser": "ICICI"
+}

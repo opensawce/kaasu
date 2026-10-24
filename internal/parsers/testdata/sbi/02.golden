@@ -1,0 +1,9 @@
+{
+  "Bank": "SBI",
+  "AmountPaise": 9950,
+  "UTR": "200000000002",
+  "PayerMasked": "A***",
+  "AccountHint": "9876",
+  "OccurredAt": "2027-01-01T18:30:00Z",
+  "Parser": "SBI"
+}

@@ -1,0 +1,9 @@
+{
+  "Bank": "Kotak",
+  "AmountPaise": 4200,
+  "UTR": "500000000005",
+  "PayerMasked": "bu***@upi",
+  "AccountHint": "1234",
+  "OccurredAt": "2026-12-11T18:30:00Z",
+  "Parser": "Kotak"
+}
