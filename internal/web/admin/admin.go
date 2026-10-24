@@ -170,7 +170,7 @@ func (d *Dashboard) today(w http.ResponseWriter, r *http.Request) {
 	var count int
 	if err := d.DB.QueryRowContext(r.Context(), `SELECT COALESCE(SUM(amount_paise),0), count(*) FROM orders
 		WHERE state IN ('confirmed','late_paid') AND confirmed_at >= ?
-		AND id NOT IN (SELECT substr(key, ?) FROM settings WHERE key LIKE ? ESCAPE '\\')`,
+		AND id NOT IN (SELECT substr(key, ?) FROM settings WHERE key LIKE ? ESCAPE '\')`,
 		start, len(wizard.TestOrderSettingPrefix)+1, strings.ReplaceAll(wizard.TestOrderSettingPrefix, "_", `\_`)+"%").Scan(&total, &count); err != nil {
 		http.Error(w, "unavailable", http.StatusInternalServerError)
 		return
