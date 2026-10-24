@@ -4,7 +4,10 @@ package states
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -79,6 +82,11 @@ func (m *Machine) Transition(ctx context.Context, tx *sql.Tx, orderID, to string
 	if _, err := ledger.Append(ctx, tx, m.clk, ledger.Entry{Kind: kind, OrderID: orderID, Payload: payload}); err != nil {
 		return from, err
 	}
+	if ev, ok := EventFor(to); ok {
+		if err := m.outbox(ctx, tx, orderID, ev); err != nil {
+			return from, err
+		}
+	}
 
 	switch to {
 	case "refunded":
@@ -99,4 +107,54 @@ func (m *Machine) Transition(ctx context.Context, tx *sql.Tx, orderID, to string
 		}
 	}
 	return from, nil
+}
+
+// EventFor names the webhook event a state change sends. Other states send nothing.
+func EventFor(to string) (string, bool) {
+	switch to {
+	case "confirmed", "late_paid":
+		return "order.confirmed", true
+	case "review", "rejected", "expired", "cancelled", "refunded", "disputed":
+		return "order." + to, true
+	}
+	return "", false
+}
+
+// outbox queues the event in the same transaction as the change. The payload carries no payer data.
+func (m *Machine) outbox(ctx context.Context, tx *sql.Tx, orderID, event string) error {
+	var o struct {
+		id, state, reference, accountID, confirmedAt string
+		amount                                       int64
+	}
+	err := tx.QueryRowContext(ctx, `SELECT id, state, COALESCE(reference,''), account_id, COALESCE(confirmed_at,''), amount_paise
+		FROM orders WHERE id = ?`, orderID).Scan(&o.id, &o.state, &o.reference, &o.accountID, &o.confirmedAt, &o.amount)
+	if err != nil {
+		return fmt.Errorf("states: outbox order: %w", err)
+	}
+	eventID := "evt_" + randomHex(12)
+	now := m.clk.Now().UTC().Format(time.RFC3339)
+	payload, err := json.Marshal(map[string]any{
+		"event_id": eventID, "type": event, "created_at": now,
+		"data": map[string]any{"order": map[string]any{
+			"id": o.id, "state": o.state, "amount_paise": o.amount, "reference": o.reference,
+			"account_id": o.accountID, "confirmed_at": o.confirmedAt,
+		}},
+	})
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO outbox(id, event_id, kind, payload, status, attempts, next_attempt_at, created_at)
+		VALUES(?,?,?,?, 'pending', 0, ?, ?)`, "obx_"+randomHex(12), eventID, event, string(payload), now, now)
+	if err != nil {
+		return fmt.Errorf("states: outbox insert: %w", err)
+	}
+	return nil
+}
+
+func randomHex(n int) string {
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		panic("states: crypto/rand failed: " + err.Error())
+	}
+	return hex.EncodeToString(b)
 }
