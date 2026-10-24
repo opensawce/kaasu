@@ -187,12 +187,7 @@ func alert(d Deps, w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusUnauthorized, "unauthorized", "request could not be verified")
 		return
 	}
-	var req alertReq
-	if err := json.Unmarshal(body, &req); err != nil {
-		fail(w, http.StatusBadRequest, "invalid_request", "body must be JSON")
-		return
-	}
-	status, resp, err := accept(r.Context(), d, dev, nonce, body, req)
+	status, resp, err := accept(r.Context(), d, dev, nonce, body)
 	switch {
 	case errors.Is(err, errReplay):
 		fail(w, http.StatusConflict, "replay", "this request was already received")
@@ -206,7 +201,7 @@ func alert(d Deps, w http.ResponseWriter, r *http.Request) {
 }
 
 // accept does everything for one verified request in one transaction: nonce, evidence, parse, alert.
-func accept(ctx context.Context, d Deps, dev devices.Device, nonce string, raw []byte, req alertReq) (int, map[string]any, error) {
+func accept(ctx context.Context, d Deps, dev devices.Device, nonce string, raw []byte) (int, map[string]any, error) {
 	status := http.StatusAccepted
 	resp := map[string]any{"status": "accepted"}
 	err := d.Store.Tx(ctx, func(tx *sql.Tx) error {
@@ -224,18 +219,22 @@ func accept(ctx context.Context, d Deps, dev devices.Device, nonce string, raw [
 		if err != nil {
 			return err
 		}
+		// A signed body that is not valid JSON is still kept as evidence and reported as unparsed.
+		var req alertReq
+		if err := json.Unmarshal(raw, &req); err != nil {
+			resp["status"] = "unparsed"
+			_, err := ledger.Append(ctx, tx, d.Clock, ledger.Entry{Kind: "alert.unparsed", Payload: map[string]any{"evidence_id": evID, "reason": "invalid_json"}})
+			return err
+		}
 		p, ok := parsers.ForSender(req.Sender)
 		if !ok {
 			resp["status"] = "ignored"
 			return nil
 		}
 		parsed, err := p.Parse(req.Text)
-		if errors.Is(err, parsers.ErrUnknownFormat) {
+		if err != nil { // unknown format or any other parser failure: keep the evidence, report unparsed
 			resp["status"] = "unparsed"
 			_, err := ledger.Append(ctx, tx, d.Clock, ledger.Entry{Kind: "alert.unparsed", Payload: map[string]any{"evidence_id": evID, "parser": p.Name()}})
-			return err
-		}
-		if err != nil {
 			return err
 		}
 		alertID, isNew, err := d.Evidence.SaveAlert(ctx, tx, evID, parsed)

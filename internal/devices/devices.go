@@ -60,7 +60,7 @@ func tokenHash(token string) string {
 func (s *Service) NewPairing(ctx context.Context) (token, payload string, err error) {
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("devices: pairing token: %w", err)
 	}
 	token = base64.RawURLEncoding.EncodeToString(raw)
 	now := s.clk.Now().UTC()
@@ -70,7 +70,7 @@ func (s *Service) NewPairing(ctx context.Context) (token, payload string, err er
 		return err
 	})
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("devices: store pairing token: %w", err)
 	}
 	q := url.Values{"host": {s.pairingHost}, "token": {token}}
 	return token, "kaasu://pair?" + q.Encode(), nil
@@ -87,14 +87,14 @@ func (s *Service) Pair(ctx context.Context, token string, pub ed25519.PublicKey,
 		res, err := tx.ExecContext(ctx, `UPDATE pair_tokens SET used_at = ? WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?`,
 			now.Format(time.RFC3339), tokenHash(token), now.Format(time.RFC3339))
 		if err != nil {
-			return err
+			return fmt.Errorf("devices: use pairing token: %w", err)
 		}
 		if n, _ := res.RowsAffected(); n != 1 {
 			return ErrBadToken
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO devices(id,label,kind,public_key,paired_at) VALUES(?,?,?,?,?)`,
 			d.ID, d.Label, d.Kind, []byte(pub), d.PairedAt); err != nil {
-			return err
+			return fmt.Errorf("devices: insert device: %w", err)
 		}
 		_, err = ledger.Append(ctx, tx, s.clk, ledger.Entry{Kind: "device.paired", Payload: map[string]any{"device_id": d.ID, "kind": kind}})
 		return err
@@ -113,7 +113,7 @@ func (s *Service) Authenticate(ctx context.Context, deviceID string) (Device, er
 		return Device{}, ErrNotFound
 	}
 	if err != nil {
-		return Device{}, err
+		return Device{}, fmt.Errorf("devices: authenticate: %w", err)
 	}
 	if revoked.Valid {
 		return Device{}, ErrRevoked
@@ -129,7 +129,7 @@ func (s *Service) Revoke(ctx context.Context, deviceID string) error {
 		res, err := tx.ExecContext(ctx, `UPDATE devices SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL`,
 			s.clk.Now().UTC().Format(time.RFC3339), deviceID)
 		if err != nil {
-			return err
+			return fmt.Errorf("devices: revoke: %w", err)
 		}
 		if n, _ := res.RowsAffected(); n == 0 {
 			return ErrNotFound
@@ -152,7 +152,7 @@ func (s *Service) TouchSeen(ctx context.Context, tx *sql.Tx, deviceID string) er
 func (s *Service) List(ctx context.Context) ([]Device, error) {
 	rows, err := s.st.Read().QueryContext(ctx, `SELECT id,label,kind,public_key,paired_at,COALESCE(last_seen_at,''),COALESCE(revoked_at,'') FROM devices ORDER BY paired_at DESC, id`)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("devices: list: %w", err)
 	}
 	defer rows.Close()
 	var out []Device
@@ -160,10 +160,13 @@ func (s *Service) List(ctx context.Context) ([]Device, error) {
 		var d Device
 		var key []byte
 		if err := rows.Scan(&d.ID, &d.Label, &d.Kind, &key, &d.PairedAt, &d.LastSeenAt, &d.RevokedAt); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("devices: list scan: %w", err)
 		}
 		d.PublicKey = key
 		out = append(out, d)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("devices: list: %w", err)
+	}
+	return out, nil
 }

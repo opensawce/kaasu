@@ -2,6 +2,7 @@
 package app
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -54,7 +55,7 @@ func New(cfg config.Config, key secrets.MasterKey, log *slog.Logger) (*App, erro
 	a.Vault = secrets.NewVault(st, key, clk)
 	a.Accounts = accounts.New(st, clk, ids)
 	a.Orders = orders.New(st, clk, ids, a.Accounts)
-	a.Devices = devices.New(st, clk, cfg.PublicAddr)
+	a.Devices = devices.New(st, clk, cmp.Or(cfg.PairingHost, cfg.IngestAddr))
 	a.Server = server.New(cfg, log)
 	// Ingest is served only on the ingest listener; admin and public never see /ingest/.
 	a.Server.Mount("ingest", "/ingest/", ingest.Handler(ingest.Deps{

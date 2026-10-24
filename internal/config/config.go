@@ -12,9 +12,11 @@ import (
 
 // Config holds process-wide settings. Money and secrets never live here.
 type Config struct {
-	PublicAddr            string `json:"public_addr"`
-	IngestAddr            string `json:"ingest_addr"`
-	AdminAddr             string `json:"admin_addr"`
+	PublicAddr string `json:"public_addr"`
+	IngestAddr string `json:"ingest_addr"`
+	AdminAddr  string `json:"admin_addr"`
+	// PairingHost is the host:port phones reach the ingest listener on (a reverse-proxy route); empty uses IngestAddr.
+	PairingHost           string `json:"pairing_host"`
 	AdminAllowNonLoopback bool   `json:"admin_allow_non_loopback"`
 	DatabasePath          string `json:"database_path"`
 	LogLevel              string `json:"log_level"`
@@ -52,6 +54,7 @@ func Load(getenv func(string) string, path string) (Config, error) {
 	str(&c.PublicAddr, "KAASU_PUBLIC_ADDR")
 	str(&c.IngestAddr, "KAASU_INGEST_ADDR")
 	str(&c.AdminAddr, "KAASU_ADMIN_ADDR")
+	str(&c.PairingHost, "KAASU_PAIRING_HOST")
 	str(&c.DatabasePath, "KAASU_DATABASE_PATH")
 	str(&c.LogLevel, "KAASU_LOG_LEVEL")
 	if v := getenv("KAASU_ADMIN_ALLOW_NON_LOOPBACK"); v != "" {

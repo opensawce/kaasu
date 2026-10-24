@@ -249,3 +249,18 @@ func TestSignaturesAreStable(t *testing.T) {
 		t.Errorf("signature must be deterministic for identical input: %q %q", a, b)
 	}
 }
+
+func TestSignedInvalidJSONIsKeptAsEvidenceAndUnparsed(t *testing.T) {
+	f := setup(t)
+	body := `not json at all`
+	resp := f.post(t, "/ingest/v1/alerts", f.signed(body, t0, nonce1), []byte(body))
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("status %d", resp.StatusCode)
+	}
+	var ev, al int
+	_ = f.st.Read().QueryRow(`SELECT count(*) FROM evidence`).Scan(&ev)
+	_ = f.st.Read().QueryRow(`SELECT count(*) FROM alerts`).Scan(&al)
+	if ev != 1 || al != 0 {
+		t.Errorf("evidence=%d alerts=%d, want 1 and 0", ev, al)
+	}
+}
