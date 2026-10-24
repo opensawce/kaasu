@@ -6,11 +6,13 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"mime"
 	"mime/multipart"
+	"mime/quotedprintable"
 	"net/mail"
 	"regexp"
 	"strings"
@@ -34,6 +36,11 @@ type RawMessage struct {
 // Fetcher returns messages that have not been seen yet.
 type Fetcher interface {
 	Fetch(ctx context.Context) ([]RawMessage, error)
+}
+
+// Marker is implemented by fetchers that can flag handled messages so they are not fetched again.
+type Marker interface {
+	MarkSeen(ctx context.Context, uids []string) error
 }
 
 // Verification is the outcome of one DKIM signature.
@@ -72,18 +79,30 @@ func (p *Poller) Once(ctx context.Context) (accepted, rejected int, err error) {
 	if err != nil {
 		return 0, 0, fmt.Errorf("fetch mail: %w", err)
 	}
+	var handled []string
 	for _, m := range msgs {
 		ok, err := p.handle(ctx, m.Raw)
 		if err != nil {
+			err = errors.Join(err, p.markSeen(ctx, handled)) // keep what was done; the failed one is retried
 			return accepted, rejected, err
 		}
+		handled = append(handled, m.UID)
 		if ok {
 			accepted++
 		} else {
 			rejected++
 		}
 	}
-	return accepted, rejected, nil
+	return accepted, rejected, p.markSeen(ctx, handled)
+}
+
+func (p *Poller) markSeen(ctx context.Context, uids []string) error {
+	if mk, ok := p.fetch.(Marker); ok {
+		if err := mk.MarkSeen(ctx, uids); err != nil {
+			return fmt.Errorf("mark mail seen: %w", err)
+		}
+	}
+	return nil
 }
 
 var (
@@ -115,8 +134,16 @@ func (p *Poller) handle(ctx context.Context, raw []byte) (bool, error) {
 	var alertID string
 	err = p.st.Tx(ctx, func(tx *sql.Tx) error {
 		evID, dup, err := p.ev.SaveEvidence(ctx, tx, "email", "", raw)
-		if err != nil || dup {
+		if err != nil {
 			return err
+		}
+		if dup {
+			// Seen before: if it already produced an alert, make sure that alert was decided (Process is idempotent).
+			e := tx.QueryRowContext(ctx, `SELECT alert_id FROM alert_sources WHERE evidence_id = ? LIMIT 1`, evID).Scan(&alertID)
+			if errors.Is(e, sql.ErrNoRows) {
+				return nil
+			}
+			return e
 		}
 		if perr != nil {
 			_, err := ledger.Append(ctx, tx, p.clk, ledger.Entry{Kind: "alert.unparsed", Payload: map[string]any{"evidence_id": evID, "parser": parser.Name()}})
@@ -185,45 +212,76 @@ func (p *Poller) reject(ctx context.Context, reason string) error {
 }
 
 // bodyText prefers text/plain, falls back to text/html with tags removed, and never reads past MaxBodyBytes.
+// It decodes base64 and quoted-printable parts and looks inside nested multipart parts.
 func bodyText(contentType string, body io.Reader) (string, error) {
-	mt, params, err := mime.ParseMediaType(contentType)
-	if err != nil || mt == "" {
-		mt = "text/plain"
-	}
-	if strings.HasPrefix(mt, "multipart/") {
-		plain, html := "", ""
-		mr := multipart.NewReader(body, params["boundary"])
-		for {
-			part, err := mr.NextPart()
-			if err != nil {
-				break
-			}
-			t, _ := bodyTextPart(part)
-			ct, _, _ := mime.ParseMediaType(part.Header.Get("Content-Type"))
-			if ct == "text/plain" && plain == "" {
-				plain = t
-			} else if ct == "text/html" && html == "" {
-				html = stripTags(t)
-			}
-		}
-		if plain != "" {
-			return plain, nil
-		}
-		return html, nil
-	}
-	b, err := io.ReadAll(io.LimitReader(body, MaxBodyBytes))
+	plain, html, err := walkPart(contentType, "", body, 0)
 	if err != nil {
 		return "", err
 	}
-	if mt == "text/html" {
-		return stripTags(string(b)), nil
+	if plain != "" {
+		return plain, nil
 	}
-	return string(b), nil
+	return stripTags(html), nil
 }
 
-func bodyTextPart(part io.Reader) (string, error) {
-	b, err := io.ReadAll(io.LimitReader(part, MaxBodyBytes))
-	return string(b), err
+func walkPart(contentType, encoding string, body io.Reader, depth int) (plain, html string, err error) {
+	mt, params, perr := mime.ParseMediaType(contentType)
+	if perr != nil || mt == "" {
+		mt = "text/plain"
+	}
+	if strings.HasPrefix(mt, "multipart/") {
+		if depth >= 5 {
+			return "", "", nil
+		}
+		mr := multipart.NewReader(body, params["boundary"])
+		for {
+			part, nerr := mr.NextPart()
+			if nerr != nil {
+				break
+			}
+			pp, ph, _ := walkPart(part.Header.Get("Content-Type"), part.Header.Get("Content-Transfer-Encoding"), part, depth+1)
+			if plain == "" {
+				plain = pp
+			}
+			if html == "" {
+				html = ph
+			}
+		}
+		return plain, html, nil
+	}
+	if mt != "text/plain" && mt != "text/html" {
+		return "", "", nil
+	}
+	var r io.Reader = body
+	switch strings.ToLower(strings.TrimSpace(encoding)) {
+	case "base64":
+		r = base64.NewDecoder(base64.StdEncoding, newlineStripper{body})
+	case "quoted-printable":
+		r = quotedprintable.NewReader(body)
+	}
+	b, rerr := io.ReadAll(io.LimitReader(r, MaxBodyBytes))
+	if rerr != nil {
+		return "", "", rerr
+	}
+	if mt == "text/html" {
+		return "", string(b), nil
+	}
+	return string(b), "", nil
+}
+
+// newlineStripper drops CR and LF so base64 bodies wrapped at 76 columns decode.
+type newlineStripper struct{ r io.Reader }
+
+func (n newlineStripper) Read(p []byte) (int, error) {
+	c, err := n.r.Read(p)
+	k := 0
+	for _, b := range p[:c] {
+		if b != '\r' && b != '\n' {
+			p[k] = b
+			k++
+		}
+	}
+	return k, err
 }
 
 var tagRe = regexp.MustCompile(`<[^>]*>`)

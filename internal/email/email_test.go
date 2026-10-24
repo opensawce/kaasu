@@ -207,3 +207,47 @@ func FuzzEmailBody(f *testing.F) {
 		_, _ = bodyText(ct, strings.NewReader(body))
 	})
 }
+
+func TestBodyTextDecodesTransferEncodingsAndNestedParts(t *testing.T) {
+	b64 := base64.StdEncoding.EncodeToString([]byte(body))
+	nested := "--outer\r\nContent-Type: multipart/alternative; boundary=inner\r\n\r\n" +
+		"--inner\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" + b64[:20] + "\r\n" + b64[20:] + "\r\n--inner--\r\n" +
+		"--outer--\r\n"
+	got, err := bodyText("multipart/mixed; boundary=outer", strings.NewReader(nested))
+	if err != nil || got != body {
+		t.Fatalf("nested base64: %q %v", got, err)
+	}
+	qp := "Rs.499.07 credited =\r\nto a/c XX1234"
+	got, err = bodyText("text/plain", strings.NewReader("x"))
+	if err != nil || got != "x" {
+		t.Fatalf("plain: %q %v", got, err)
+	}
+	pl, _, err := walkPart("text/plain", "quoted-printable", strings.NewReader(qp), 0)
+	if err != nil || pl != "Rs.499.07 credited to a/c XX1234" {
+		t.Fatalf("qp: %q %v", pl, err)
+	}
+}
+
+type markingFetcher struct {
+	fakeFetcher
+	marked []string
+}
+
+func (m *markingFetcher) MarkSeen(_ context.Context, uids []string) error {
+	m.marked = append(m.marked, uids...)
+	return nil
+}
+
+func TestHandledMessagesAreMarkedSeen(t *testing.T) {
+	p, f := setup(t)
+	good := f.signed(t, f.domain, f.message(f.domain, body))
+	bad := f.message("evil.example", body)
+	mf := &markingFetcher{fakeFetcher: fakeFetcher{msgs: []RawMessage{{UID: "7", Raw: good}, {UID: "8", Raw: bad}}}}
+	p.fetch = mf
+	if _, _, err := p.Once(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(mf.marked, ",") != "7,8" {
+		t.Errorf("marked %v, want both accepted and rejected messages", mf.marked)
+	}
+}
