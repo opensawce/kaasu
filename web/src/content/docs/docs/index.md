@@ -10,6 +10,7 @@ Kaasu confirms UPI payments for small shops. Customers pay your bank directly, a
 1. [Install Kaasu](/docs/start/install/) and try it with demo data.
 2. [Take your first payment](/docs/start/first-payment/).
 3. [Connect a bank alert source](/docs/connect/android-forwarder/).
+4. [Connect your shop](/docs/connect/woocommerce/): WooCommerce works today, [Shopify](/docs/connect/shopify/) is planned.
 
 ## How these docs are kept
 
