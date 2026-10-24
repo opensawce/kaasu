@@ -61,7 +61,7 @@ func Lookup(name string) (Scenario, bool) {
 func Send(ctx context.Context, base, deviceID string, key ed25519.PrivateKey, ts time.Time, nonce string, body []byte) (int, []byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(base, "/")+"/ingest/v1/alerts", bytes.NewReader(body))
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, fmt.Errorf("sim: build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	for k, v := range ingest.Sign(key, deviceID, ts, nonce, body) {
@@ -69,10 +69,13 @@ func Send(ctx context.Context, base, deviceID string, key ed25519.PrivateKey, ts
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, fmt.Errorf("sim: send alert: %w", err)
 	}
 	defer resp.Body.Close()
-	out, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
+	out, err := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
+	if err != nil {
+		return resp.StatusCode, out, fmt.Errorf("sim: read response: %w", err)
+	}
 	return resp.StatusCode, out, nil
 }
 
