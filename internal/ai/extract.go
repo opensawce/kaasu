@@ -18,7 +18,7 @@ var extractSchema = map[string]any{
 	"properties": map[string]any{
 		"amount_paise": map[string]any{"type": "integer", "minimum": int64(1), "maximum": int64(10000000_00)},
 		"utr":          map[string]any{"type": "string", "maxLength": 12},
-		"occurred_at":  map[string]any{"type": "string", "maxLength": 40},
+		"occurred_at":  map[string]any{"type": "string", "maxLength": 40, "description": "RFC 3339 timestamp, for example 2026-01-02T15:04:05+05:30; never a bare date"},
 		"is_credit":    map[string]any{"type": "boolean"},
 		"bank":         map[string]any{"type": "string", "maxLength": 40},
 	},
@@ -32,7 +32,7 @@ type extracted struct {
 	Bank        string `json:"bank"`
 }
 
-const extractSystem = "Extract the amount in integer paise, the 12-digit UTR (or empty), the time, whether money was received, and the bank name from this bank message. Answer only with the JSON object."
+const extractSystem = "Extract the amount in integer paise, the 12-digit UTR (or empty), the time as an RFC 3339 timestamp with a UTC offset (never a bare date), whether money was received, and the bank name from this bank message. Answer only with the JSON object."
 
 // Extract reads an alert no parser knows. The result is always marked Parser "ai" so it can only go to review.
 func Extract(ctx context.Context, s *Service, text string) (evidence.Parsed, error) {
