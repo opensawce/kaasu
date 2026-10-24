@@ -61,7 +61,8 @@ func (m *Machine) Transition(ctx context.Context, tx *sql.Tx, orderID, to string
 	}
 	confirmed := to == "confirmed" || to == "late_paid"
 	if _, err := tx.ExecContext(ctx, `UPDATE orders SET state = ?, updated_at = ?,
-		confirmed_at = CASE WHEN ? THEN ? ELSE confirmed_at END WHERE id = ?`, to, now, confirmed, now, orderID); err != nil {
+		confirmed_at = CASE WHEN ? THEN ? ELSE confirmed_at END,
+		queued_at = CASE WHEN ? = 'queued' THEN ? ELSE queued_at END WHERE id = ?`, to, now, confirmed, now, to, now, orderID); err != nil {
 		return from, fmt.Errorf("states: update %s: %w", orderID, err)
 	}
 

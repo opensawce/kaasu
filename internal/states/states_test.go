@@ -384,3 +384,39 @@ func TestTransitionOnFinishedTxFails(t *testing.T) {
 		t.Error("a finished tx must not transition")
 	}
 }
+
+func TestQueuedAtSetOnEntryAndPromotionIsFIFO(t *testing.T) {
+	e := setup(t)
+	exp := t0.Add(time.Hour)
+	for i := range 100 {
+		id := fmt.Sprintf("f_%03d", i)
+		if err := mk(e, id, "awaiting", exp); err != nil {
+			t.Fatal(err)
+		}
+		if err := e.st.Tx(e.ctx, func(tx *sql.Tx) error {
+			_, err := e.p.Reserve(e.ctx, tx, e.acc.ID, id, 49900, exp)
+			return err
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// "q_b" sorts after "q_a" by id, so only queued_at can make q_b the older one.
+	for _, id := range []string{"q_b", "q_a"} {
+		if err := mk(e, id, "created", exp); err != nil {
+			t.Fatal(err)
+		}
+		e.clk.Advance(time.Minute)
+		if _, err := tr(e, id, "queued", nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := tr(e, "f_000", "review", nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tr(e, "f_000", "rejected", nil); err != nil {
+		t.Fatal(err)
+	}
+	if a, b := stateOf(t, e, "q_b"), stateOf(t, e, "q_a"); a != "awaiting" || b != "queued" {
+		t.Fatalf("oldest queued order should win the freed slot: q_b=%s q_a=%s", a, b)
+	}
+}
