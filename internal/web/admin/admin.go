@@ -4,8 +4,10 @@ package admin
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"html/template"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -23,6 +25,7 @@ type Dashboard struct {
 	Lang   i18n.Lang
 	Now    func() time.Time
 	Review *review.Service
+	Log    *slog.Logger
 }
 
 var (
@@ -89,10 +92,10 @@ func (d *Dashboard) confirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := d.Review.Confirm(r.Context(), r.PathValue("id"), "admin:"+a.Name); err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
+		d.decisionError(w, r, err)
 		return
 	}
-	http.Redirect(w, r, "/admin/review", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/", http.StatusSeeOther)
 }
 
 func (d *Dashboard) reject(w http.ResponseWriter, r *http.Request) {
@@ -101,10 +104,27 @@ func (d *Dashboard) reject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := d.Review.Reject(r.Context(), r.PathValue("id"), r.PostFormValue("reason"), "admin:"+a.Name); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		d.decisionError(w, r, err)
 		return
 	}
-	http.Redirect(w, r, "/admin/review", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/", http.StatusSeeOther)
+}
+
+// decisionError shows the known review errors to the owner; anything else is logged and hidden.
+func (d *Dashboard) decisionError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, review.ErrNotFound):
+		http.Error(w, err.Error(), http.StatusNotFound)
+	case errors.Is(err, review.ErrNotInReview), errors.Is(err, review.ErrNoMatch):
+		http.Error(w, err.Error(), http.StatusConflict)
+	case errors.Is(err, review.ErrNoReason):
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	default:
+		if d.Log != nil {
+			d.Log.ErrorContext(r.Context(), "review decision failed", "err", err)
+		}
+		http.Error(w, "something went wrong", http.StatusInternalServerError)
+	}
 }
 
 func (d *Dashboard) auth(next http.Handler) http.Handler { return d.Auth.Require(next) }

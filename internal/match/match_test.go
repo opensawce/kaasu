@@ -348,7 +348,7 @@ func TestOnlyMatchConfirms(t *testing.T) {
 			return err
 		}
 		if call.Match(b) {
-			t.Errorf("%s confirms orders; only internal/match may", path)
+			t.Errorf("%s confirms orders; only internal/states, internal/match and the owner-decision path in internal/review may", path)
 		}
 		return nil
 	})

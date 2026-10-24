@@ -107,7 +107,7 @@ func New(cfg config.Config, key secrets.MasterKey, log *slog.Logger) (*App, erro
 	}
 	a.Server = server.New(cfg, log)
 	// The merchant dashboard is on the admin listener only.
-	dash := &admin.Dashboard{Auth: a.Admin, DB: st.Read(), Lang: "en", Now: clk.Now,
+	dash := &admin.Dashboard{Auth: a.Admin, DB: st.Read(), Lang: "en", Now: clk.Now, Log: log,
 		Review: review.New(st, clk, states.New(clk, pool.New(st, clk)))}
 	dashMux := http.NewServeMux()
 	dash.Register(dashMux)

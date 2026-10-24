@@ -168,3 +168,26 @@ func TestDetailHasRawAlert(t *testing.T) {
 		t.Errorf("unknown: %v", err)
 	}
 }
+
+func TestDecisionWithoutAHeldMatchChangesNothing(t *testing.T) {
+	e := setup(t)
+	o, _, err := e.ord.Create(e.ctx, orders.CreateInput{AmountPaise: 49907, AccountID: e.acc, ExpiresIn: time.Hour}, "nomatch")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.st.Tx(e.ctx, func(tx *sql.Tx) error {
+		_, err := e.sm.Transition(e.ctx, tx, o.ID, "review", nil)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.svc.Confirm(e.ctx, o.ID, "admin:priya"); !errors.Is(err, ErrNoMatch) {
+		t.Fatalf("confirm without a held match: %v", err)
+	}
+	if err := e.svc.Reject(e.ctx, o.ID, "other", "admin:priya"); !errors.Is(err, ErrNoMatch) {
+		t.Fatalf("reject without a held match: %v", err)
+	}
+	if got := e.state(t, o.ID); got != "review" {
+		t.Errorf("state=%s, the failed decisions must roll back", got)
+	}
+}

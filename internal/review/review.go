@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/opensawce/kaasu/internal/clock"
@@ -18,6 +19,7 @@ var (
 	ErrNotInReview = errors.New("this payment is no longer waiting for a decision")
 	ErrNoReason    = errors.New("choose a reason for rejecting")
 	ErrNotFound    = errors.New("payment not found")
+	ErrNoMatch     = errors.New("no held match found for this payment")
 )
 
 // Reasons are the only reasons a rejection can carry.
@@ -74,8 +76,11 @@ func (s *Service) Detail(ctx context.Context, orderID string) (Item, error) {
 	for _, it := range items {
 		if it.OrderID == orderID {
 			var raw []byte
-			_ = s.st.Read().QueryRowContext(ctx, `SELECT e.body FROM alert_sources src JOIN evidence e ON e.id = src.evidence_id
+			err := s.st.Read().QueryRowContext(ctx, `SELECT e.body FROM alert_sources src JOIN evidence e ON e.id = src.evidence_id
 				JOIN matches m ON m.alert_id = src.alert_id WHERE m.order_id = ? LIMIT 1`, orderID).Scan(&raw)
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return Item{}, fmt.Errorf("review: read raw alert: %w", err)
+			}
 			it.RawAlert = string(raw)
 			return it, nil
 		}
@@ -105,8 +110,7 @@ func (s *Service) Confirm(ctx context.Context, orderID, actor string) error {
 		if _, err := s.sm.Transition(ctx, tx, orderID, to, map[string]any{"decided_by": actor}); err != nil {
 			return err
 		}
-		_, err = tx.ExecContext(ctx, `UPDATE matches SET decision = 'auto', decided_by = ? WHERE order_id = ? AND decision = 'review'`, actor, orderID)
-		return err
+		return decideMatch(ctx, tx, `UPDATE matches SET decision = 'auto', decided_by = ? WHERE order_id = ? AND decision = 'review'`, actor, orderID)
 	})
 }
 
@@ -131,9 +135,21 @@ func (s *Service) Reject(ctx context.Context, orderID, reason, actor string) err
 		if _, err := s.sm.Transition(ctx, tx, orderID, "rejected", map[string]any{"reason": reason, "decided_by": actor}); err != nil {
 			return err
 		}
-		_, err = tx.ExecContext(ctx, `UPDATE matches SET decision = 'rejected', decided_by = ?, reason = ? WHERE order_id = ? AND decision = 'review'`, actor, reason, orderID)
-		return err
+		return decideMatch(ctx, tx, `UPDATE matches SET decision = 'rejected', decided_by = ?, reason = ? WHERE order_id = ? AND decision = 'review'`, actor, reason, orderID)
 	})
+}
+
+// decideMatch records the decision on the held match. With no such match the whole transaction rolls back,
+// so an order never changes state without a recorded decision.
+func decideMatch(ctx context.Context, tx *sql.Tx, q string, args ...any) error {
+	res, err := tx.ExecContext(ctx, q, args...)
+	if err != nil {
+		return fmt.Errorf("review: record decision: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNoMatch
+	}
+	return nil
 }
 
 func validReason(r string) bool {
