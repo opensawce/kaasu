@@ -3,7 +3,8 @@
 set -eu
 t=${1:-20s}
 found=0
-for pkg in $(go list ./...); do
+pkgs=$(go list ./...)
+for pkg in $pkgs; do
   dir=$(go list -f '{{.Dir}}' "$pkg")
   for f in $(grep -hoE '^func (Fuzz[A-Za-z0-9_]+)' "$dir"/*_test.go 2>/dev/null | awk '{print $2}'); do
     found=1
