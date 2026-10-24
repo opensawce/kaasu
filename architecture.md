@@ -29,6 +29,8 @@ KAASU-INGEST-V1\n<deviceID>\n<unixSeconds>\n<nonce>\n<hex(sha256(body))>
 ```
 Headers: `X-Kaasu-Device`, `X-Kaasu-Timestamp`, `X-Kaasu-Nonce` (16 to 64 characters), `X-Kaasu-Signature` (base64). A request is accepted when its timestamp is within 60 seconds of server time, the signature verifies and the device is paired and not revoked. Nonces are stored per device; a repeat is `409 replay`. Every other failure is `401 unauthorized` with no detail. Raw evidence is stored as received, before parsing.
 
+**Matcher and policy (issue #18).** The matcher is the only code that confirms a payment (a test scans the repo to enforce this). An alert is compared with open orders that have the exact amount. One candidate: an order past its expiry is late and goes to review even before the expiry job runs; a cancelled or rejected order goes to review as `order_closed` and stays closed; an awaiting order is scored. The score is built from signals with weights exact 40, authentic 20, UTR 10, note 10, timing 10, payer 5, multiple sources 5. Automatic confirmation needs an exact amount, an authentic source (device or DKIM-verified email, never manual), a score of at least 80, and an account limit the order is under. Anything else goes to review with a reason. Two candidates are ambiguous and both go to review. An alert one to 99 paise above an open order's base goes to review as `amount_mismatch`. Processing the same alert twice changes nothing.
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 
