@@ -19,6 +19,11 @@ import (
 // Addrs are the bound listener addresses (useful when configured with port 0).
 type Addrs struct{ Public, Ingest, Admin string }
 
+type mount struct {
+	listener, pattern string
+	h                 http.Handler
+}
+
 type listener struct {
 	name string
 	srv  *http.Server
@@ -27,11 +32,26 @@ type listener struct {
 
 // Server owns the three HTTP servers.
 type Server struct {
-	cfg config.Config
-	log *slog.Logger
-	ls  []*listener
+	cfg    config.Config
+	log    *slog.Logger
+	ls     []*listener
+	mounts []mount
 	// errc reports a listener that stopped for any reason other than Shutdown.
 	errc chan error
+}
+
+// Mount serves h at pattern on one listener ("public", "ingest" or "admin"). Call before Start.
+func (s *Server) Mount(listenerName, pattern string, h http.Handler) {
+	s.mounts = append(s.mounts, mount{listenerName, pattern, h})
+}
+
+func (s *Server) mux(name string, m *http.ServeMux) *http.ServeMux {
+	for _, mt := range s.mounts {
+		if mt.listener == name {
+			m.Handle(mt.pattern, mt.h)
+		}
+	}
+	return m
 }
 
 func New(cfg config.Config, log *slog.Logger) *Server {
@@ -61,9 +81,9 @@ func (s *Server) Start() error {
 		name, addr string
 		h          http.Handler
 	}{
-		{"public", s.cfg.PublicAddr, baseMux()},
-		{"ingest", s.cfg.IngestAddr, baseMux()},
-		{"admin", s.cfg.AdminAddr, adminMux()},
+		{"public", s.cfg.PublicAddr, s.mux("public", baseMux())},
+		{"ingest", s.cfg.IngestAddr, s.mux("ingest", baseMux())},
+		{"admin", s.cfg.AdminAddr, s.mux("admin", adminMux())},
 	}
 	for _, sp := range specs {
 		ln, err := net.Listen("tcp", sp.addr)

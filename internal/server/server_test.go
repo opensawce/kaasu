@@ -84,3 +84,22 @@ func TestStartFailsWhenPortTaken(t *testing.T) {
 		t.Fatal("expected bind error")
 	}
 }
+
+func TestMountOnlyAppearsOnItsListener(t *testing.T) {
+	cfg := config.Config{PublicAddr: "127.0.0.1:0", IngestAddr: "127.0.0.1:0", AdminAddr: "127.0.0.1:0"}
+	s := New(cfg, slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	s.Mount("public", "/v1/", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("api")) }))
+	if err := s.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Shutdown(context.Background()) })
+	a := s.Addrs()
+	if code, body := get(t, "http://"+a.Public+"/v1/orders"); code != 200 || body != "api" {
+		t.Errorf("public: %d %q", code, body)
+	}
+	for name, addr := range map[string]string{"ingest": a.Ingest, "admin": a.Admin} {
+		if code, _ := get(t, "http://"+addr+"/v1/orders"); code != 404 {
+			t.Errorf("%s should not serve /v1/, got %d", name, code)
+		}
+	}
+}
