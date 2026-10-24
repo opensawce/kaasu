@@ -332,7 +332,8 @@ func TestUnmatchedAlertStaysUnmatched(t *testing.T) {
 // Only internal/match and internal/states may move an order to confirmed. Review (card 25) must use its own path.
 func TestOnlyMatchConfirms(t *testing.T) {
 	root := filepath.Join("..", "..")
-	allowed := map[string]bool{"internal/match": true, "internal/states": true}
+	// internal/review confirms only on an owner decision, behind owner role and fresh sign-in.
+	allowed := map[string]bool{"internal/match": true, "internal/states": true, "internal/review": true}
 	call := regexp.MustCompile(`Transition\(.*"confirmed"`)
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
@@ -347,7 +348,7 @@ func TestOnlyMatchConfirms(t *testing.T) {
 			return err
 		}
 		if call.Match(b) {
-			t.Errorf("%s confirms orders; only internal/match may", path)
+			t.Errorf("%s confirms orders; only internal/states, internal/match and the owner-decision path in internal/review may", path)
 		}
 		return nil
 	})

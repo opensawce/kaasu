@@ -14,7 +14,10 @@ import (
 	"github.com/opensawce/kaasu/i18n"
 	"github.com/opensawce/kaasu/internal/adminauth"
 	"github.com/opensawce/kaasu/internal/clock"
+	"github.com/opensawce/kaasu/internal/pool"
+	"github.com/opensawce/kaasu/internal/review"
 	"github.com/opensawce/kaasu/internal/secrets"
+	"github.com/opensawce/kaasu/internal/states"
 	"github.com/opensawce/kaasu/internal/store"
 	"github.com/opensawce/kaasu/internal/testutil"
 )
@@ -39,7 +42,7 @@ func setup(t *testing.T) env {
 	if _, err := auth.CreateAdmin(ctx, "priya", "owner", seed); err != nil {
 		t.Fatal(err)
 	}
-	d := &Dashboard{Auth: auth, DB: st.Read(), Lang: i18n.Lang("en"), Now: clk.Now}
+	d := &Dashboard{Auth: auth, DB: st.Read(), Lang: i18n.Lang("en"), Now: clk.Now, Review: review.New(st, clk, states.New(clk, pool.New(st, clk)))}
 	m := http.NewServeMux()
 	d.Register(m)
 	return env{st: st, h: m, clk: clk, ctx: ctx, db: st.Read()}
@@ -129,5 +132,29 @@ func TestPayerNeverShownInFull(t *testing.T) {
 		if strings.Contains(body, "ravi.kumar@okicici") {
 			t.Errorf("%s shows a full VPA", p)
 		}
+	}
+}
+
+// Staff are read-only: a staff session cannot confirm, even with a valid CSRF token.
+func TestStaffCannotConfirm(t *testing.T) {
+	e := setup(t)
+	vault := secrets.NewVault(e.st, secrets.MasterKey(make([]byte, 32)), e.clk)
+	auth := adminauth.New(e.st, e.clk, vault)
+	if _, err := auth.CreateAdmin(e.ctx, "ravi", "staff", seed); err != nil {
+		t.Fatal(err)
+	}
+	staffTok, err := auth.Login(e.ctx, "ravi", adminauth.CodeAt(seed, e.clk.Now()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	csrf, _ := auth.CSRFToken(e.ctx, staffTok)
+	form := url.Values{"csrf": {csrf}}
+	req := httptest.NewRequest("POST", "/admin/review/ord_x/confirm", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: adminauth.CookieName, Value: staffTok})
+	rec := httptest.NewRecorder()
+	e.h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("staff confirm: %d", rec.Code)
 	}
 }
