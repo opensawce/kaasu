@@ -5,10 +5,12 @@ import { check } from 'k6';
 import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 
 export const options = {
-  scenarios: { create: { executor: 'constant-arrival-rate', rate: 50, timeUnit: '1s', duration: '60s', preAllocatedVUs: 20 } },
+  scenarios: { create: { executor: 'constant-arrival-rate', rate: 50, timeUnit: '1s', duration: '60s', preAllocatedVUs: 50, maxVUs: 200 } },
   thresholds: {
     http_req_duration: ['p(95)<250'],
     http_req_failed: ['rate<0.01'],
+    checks: ['rate==1'],               // every order must come back 201
+    dropped_iterations: ['count==0'], // the full 50/s must actually be sent
   },
 };
 

@@ -151,7 +151,8 @@ func TestAttacksNeverConfirm(t *testing.T) {
 		}},
 		{"unsigned request", 50004, func(x *h, b []byte) int { return x.post(http.Header{}, b) }},
 		{"forged sender", 50005, func(x *h, b []byte) int {
-			return x.post(x.signedBy(x.key, time.Now(), alertBody(50005, "111111111111", "EVIL-BANK")), alertBody(50005, "111111111111", "EVIL-BANK"))
+			s := alertBody(50005, "111111111111", "EVIL-BANK")
+			return x.post(x.signedBy(x.key, time.Now(), s), s)
 		}},
 		{"look-alike sender", 50006, func(x *h, b []byte) int {
 			s := alertBody(50006, "121212121212", "HDFCBK.evil")
