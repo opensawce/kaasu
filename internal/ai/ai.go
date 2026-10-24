@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/opensawce/kaasu/internal/id"
+	"io"
 	"regexp"
 	"strings"
 	"time"
@@ -48,10 +50,10 @@ type Provider interface {
 }
 
 var (
-	vpaRe  = regexp.MustCompile(`\b[A-Za-z0-9._-]{2,}@[a-z]{3,}\b`)
+	vpaRe  = regexp.MustCompile(`(?i)\b[A-Za-z0-9._-]{2,}@[a-z]{3,}\b`)
 	utrRe  = regexp.MustCompile(`\b[0-9]{12}\b`)
 	acctRe = regexp.MustCompile(`\b[0-9]{9,18}\b`)
-	mailRe = regexp.MustCompile(`\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}\b`)
+	mailRe = regexp.MustCompile(`(?i)\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}\b`)
 )
 
 // Mask replaces identifiers before any text leaves the machine.
@@ -118,8 +120,13 @@ func (s *Service) checkBudget(ctx context.Context) error {
 		return ErrBudget
 	}
 	var spent int64
-	month := s.clk.Now().In(istZone).Format("2006-01")
-	_ = s.st.Read().QueryRowContext(ctx, `SELECT COALESCE(SUM(cost_micro_inr),0) FROM ai_usage WHERE substr(at,1,7) = ?`, month).Scan(&spent)
+	// The cap runs on the IST calendar month; usage rows are stamped in UTC, so compare against the UTC bounds of that month.
+	now := s.clk.Now().In(istZone)
+	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, istZone).UTC().Format(time.RFC3339)
+	end := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, istZone).UTC().Format(time.RFC3339)
+	if err := s.st.Read().QueryRowContext(ctx, `SELECT COALESCE(SUM(cost_micro_inr),0) FROM ai_usage WHERE at >= ? AND at < ?`, start, end).Scan(&spent); err != nil {
+		return fmt.Errorf("ai: read usage: %w", err)
+	}
 	limit := parseRupees(capRupees) * 1_000_000
 	if spent >= limit {
 		return ErrBudget
@@ -131,7 +138,7 @@ func (s *Service) record(ctx context.Context, feature string, r Response) error 
 	return s.st.Tx(ctx, func(tx *sql.Tx) error {
 		cost := int64(r.InputTokens*3 + r.OutputTokens*15) // estimate in micro-rupees; see budget.go
 		if _, err := tx.ExecContext(ctx, `INSERT INTO ai_usage(id, at, feature, provider, model, input_tokens, output_tokens, cost_micro_inr)
-			VALUES(?,?,?,?,?,?,?,?)`, fmt.Sprintf("aiu_%d", s.clk.Now().UnixNano()), s.clk.Now().UTC().Format(time.RFC3339),
+			VALUES(?,?,?,?,?,?,?,?)`, id.New("aiu"), s.clk.Now().UTC().Format(time.RFC3339),
 			feature, s.provider.Name(), r.Model, r.InputTokens, r.OutputTokens, cost); err != nil {
 			return err
 		}
@@ -159,6 +166,9 @@ func Validate(schema map[string]any, raw json.RawMessage) error {
 	dec := json.NewDecoder(strings.NewReader(string(raw)))
 	dec.UseNumber()
 	if err := dec.Decode(&v); err != nil {
+		return ErrSchema
+	}
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) { // a second value or trailing data is not an answer
 		return ErrSchema
 	}
 	return check(schema, v)

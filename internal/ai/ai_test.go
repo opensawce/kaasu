@@ -163,3 +163,23 @@ func TestAIPackageCannotChangeOrders(t *testing.T) {
 	}
 	_ = os.Getenv
 }
+
+func TestMaskCatchesUppercaseIdentifiers(t *testing.T) {
+	got := Mask("pay RAVI.KUMAR@OKICICI or Ravi@Example.COM")
+	if strings.Contains(strings.ToLower(got), "ravi") {
+		t.Errorf("uppercase identifiers leaked: %q", got)
+	}
+}
+
+func TestValidateRejectsTrailingJSON(t *testing.T) {
+	schema := map[string]any{"type": "object"}
+	if err := Validate(schema, json.RawMessage(`{} {"x":1}`)); err == nil {
+		t.Error("a second JSON value must be rejected")
+	}
+	if err := Validate(schema, json.RawMessage(`{} junk`)); err == nil {
+		t.Error("trailing text must be rejected")
+	}
+	if err := Validate(schema, json.RawMessage(`{}`)); err != nil {
+		t.Errorf("a single object passes: %v", err)
+	}
+}
