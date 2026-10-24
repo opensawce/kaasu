@@ -52,7 +52,7 @@ func (h redactHandler) Handle(ctx context.Context, r slog.Record) error {
 		return true
 	})
 	if id := RequestIDFrom(ctx); id != "" {
-		nr.AddAttrs(slog.String("request_id", id))
+		nr.AddAttrs(slog.String("request_id", Redact(id)))
 	}
 	return h.inner.Handle(ctx, nr)
 }
@@ -65,8 +65,12 @@ func redactAttr(a slog.Attr) slog.Attr {
 		}
 		return slog.Group(a.Key, attrs...)
 	}
-	if a.Value.Kind() == slog.KindString {
+	switch a.Value.Kind() {
+	case slog.KindString:
 		return slog.String(a.Key, Redact(a.Value.String()))
+	case slog.KindAny:
+		// Errors and other values are rendered to text first, so their message cannot bypass redaction.
+		return slog.String(a.Key, Redact(fmt.Sprint(a.Value.Any())))
 	}
 	return a
 }

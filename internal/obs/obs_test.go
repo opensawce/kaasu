@@ -3,6 +3,7 @@ package obs
 import (
 	"bytes"
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -93,4 +94,14 @@ func FuzzRedact(f *testing.F) {
 	f.Fuzz(func(t *testing.T, s string) {
 		_ = Redact(s)
 	})
+}
+
+func TestErrorAttributesAreRedacted(t *testing.T) {
+	var buf bytes.Buffer
+	log := NewLogger(&buf, slog.LevelDebug)
+	log.Error("failed", "err", errors.New("payer ravi.kumar@okicici utr 629812345678"))
+	out := buf.String()
+	if strings.Contains(out, "ravi.kumar") || strings.Contains(out, "629812345678") {
+		t.Fatalf("error text leaked: %s", out)
+	}
 }

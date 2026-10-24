@@ -55,7 +55,7 @@ func Recover(log *slog.Logger) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			defer func() {
 				if p := recover(); p != nil {
-					log.Error("handler panic", "path", r.URL.Path, "panic", fmt.Sprint(p))
+					log.ErrorContext(r.Context(), "handler panic", "path", r.URL.Path, "panic", fmt.Sprint(p))
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusInternalServerError)
 					_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]string{"code": "internal", "message": "something went wrong"}})
