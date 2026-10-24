@@ -1,0 +1,22 @@
+{
+  "status.received": "Money received",
+  "status.needs_ok": "Needs your OK",
+  "status.waiting": "Waiting",
+  "status.phone_offline": "Phone offline",
+  "status.problem": "Problem",
+  "pay.button": "Pay {amount} with any UPI app",
+  "pay.waiting.title": "Waiting for your payment",
+  "pay.waiting.step_open": "Open your UPI app",
+  "pay.waiting.step_approve": "Approve the payment",
+  "pay.waiting.step_confirm": "We confirm it, usually within a minute",
+  "pay.already_paid": "Already paid? Don't pay again.",
+  "pay.queued": "Waiting for a free slot, usually under a minute.",
+  "pay.expired": "This payment link expired. Ask the shop for a new one.",
+  "confirmed.title": "Payment received",
+  "confirmed.paid_to": "Paid to",
+  "review.confirm": "Confirm payment",
+  "review.reject": "Reject",
+  "voice.received": "{amount} received",
+  "voice.test": "Kaasu voice is working",
+  "error.generic": "Something went wrong. Nothing was charged; try again in a moment."
+}
