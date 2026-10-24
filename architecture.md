@@ -37,6 +37,8 @@ Headers: `X-Kaasu-Device`, `X-Kaasu-Timestamp`, `X-Kaasu-Nonce` (16 to 64 charac
 
 **Signed webhooks (issue #11).** Every change that matters to a shop writes an outbox row in the same transaction as the change: `order.confirmed`, `order.review`, `order.rejected`, `order.expired`, `order.cancelled`, `order.refunded`, `order.disputed`. The payload carries the order id, state, amount, reference and account, never payer data. Delivery is at least once with header `X-Kaasu-Signature: t=<unix>,v1=<hex HMAC-SHA256(secret, t "." body)>` and `X-Kaasu-Event-Id`. Retries wait 10 s, 30 s, 2 min, 10 min, 1 h, 6 h and 12 h between eight attempts (seven waits), then the event is dead-lettered. Targets must be https and must not resolve to loopback, private or link-local addresses; the guard checks the address actually dialled, and redirects are refused. Receivers verify with `webhooks.Verify` and dedupe by `event_id`.
 
+**Refunds (issue #33).** Kaasu never moves money; a refund is a record of one the merchant made in their own bank app. A refund is allowed only on a confirmed or late-paid order, the total refunded can never exceed the amount paid (checked inside the write transaction, so concurrent refunds cannot overshoot), and a UTR can be recorded once. A partial refund leaves the order in its current state (confirmed or late_paid); the refund that returns the full amount moves it to refunded, which sends the `order.refunded` webhook and frees the slot.
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 
