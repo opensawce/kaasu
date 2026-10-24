@@ -6,8 +6,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"html"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -131,8 +133,31 @@ func (s *Service) OpenCounter(ctx context.Context, id string, amount int64, visi
 	return s.order(ctx, l, amount, visitor)
 }
 
+// order opens (or reuses) the visitor's current payment attempt. A refresh keeps the attempt while its order is still
+// open; once that order has expired, been cancelled or been paid, the next visit starts a new attempt with a new key.
 func (s *Service) order(ctx context.Context, l Link, amount int64, visitor string) (orders.Order, error) {
-	key := "link:" + l.ID + ":" + visitor + ":" + itoa(amount)
+	prefix := "link:" + l.ID + ":" + visitor + ":" + itoa(amount) + ":"
+	attempt := 1
+	var lastKey, state, expires string
+	err := s.st.Read().QueryRowContext(ctx, `SELECT idempotency_key, state, expires_at FROM orders
+		WHERE substr(idempotency_key, 1, ?) = ? ORDER BY created_at DESC, rowid DESC LIMIT 1`, len(prefix), prefix).Scan(&lastKey, &state, &expires)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+	case err != nil:
+		return orders.Order{}, fmt.Errorf("links: find attempt: %w", err)
+	default:
+		n, perr := strconv.Atoi(strings.TrimPrefix(lastKey, prefix))
+		if perr != nil {
+			return orders.Order{}, fmt.Errorf("links: bad attempt key %q: %w", lastKey, perr)
+		}
+		attempt = n
+		exp, _ := time.Parse(time.RFC3339, expires)
+		open := (state == "awaiting" || state == "queued" || state == "created") && s.clk.Now().Before(exp)
+		if !open {
+			attempt = n + 1
+		}
+	}
+	key := prefix + itoa(int64(attempt))
 	o, _, err := s.orders.Create(ctx, orders.CreateInput{AmountPaise: amount, AccountID: l.AccountID, Note: l.Note, Reference: "link:" + l.ID}, key)
 	return o, err
 }

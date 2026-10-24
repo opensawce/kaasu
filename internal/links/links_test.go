@@ -44,7 +44,10 @@ func TestLinkCreatesOrderPerVisit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	o2, _ := e.svc.Open(e.ctx, l.ID, "browser-b")
+	o2, err := e.svc.Open(e.ctx, l.ID, "browser-b")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if o1.ID == o2.ID {
 		t.Error("a different visitor gets a different order")
 	}
@@ -54,10 +57,34 @@ func TestLinkCreatesOrderPerVisit(t *testing.T) {
 func TestRefreshReusesOrder(t *testing.T) {
 	e := setup(t)
 	l, _ := e.svc.Create(e.ctx, Input{AccountID: e.acc, Kind: "link", AmountPaise: 49907})
-	a, _ := e.svc.Open(e.ctx, l.ID, "same")
-	b, _ := e.svc.Open(e.ctx, l.ID, "same")
+	a, err := e.svc.Open(e.ctx, l.ID, "same")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := e.svc.Open(e.ctx, l.ID, "same")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if a.ID != b.ID {
 		t.Errorf("refresh made a new order: %s %s", a.ID, b.ID)
+	}
+}
+
+// After the first order is no longer open, the same visitor starts a fresh, payable attempt.
+func TestVisitAfterExpiryStartsANewAttempt(t *testing.T) {
+	e := setup(t)
+	l, _ := e.svc.Create(e.ctx, Input{AccountID: e.acc, Kind: "link", AmountPaise: 49907})
+	a, err := e.svc.Open(e.ctx, l.ID, "same")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.clk.Advance(2 * time.Hour)
+	b, err := e.svc.Open(e.ctx, l.ID, "same")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.ID == b.ID {
+		t.Fatal("a visit after the order expired must get a new order")
 	}
 }
 
