@@ -1,5 +1,6 @@
 {
   "status.received": "पैसे मिल गए",
+  "status.refunded": "वापस किया गया",
   "status.needs_ok": "आपकी मंज़ूरी चाहिए",
   "status.waiting": "इंतज़ार",
   "status.phone_offline": "फ़ोन ऑफ़लाइन",

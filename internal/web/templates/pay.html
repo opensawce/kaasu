@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="{{.Lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}}</title>
+<link rel="stylesheet" href="/static/tokens.css">
+<link rel="stylesheet" href="/static/pay.css">
+</head>
+<body>
+<main class="pay" data-status-url="{{.StatusURL}}" data-state="{{.State}}">
+  <p class="shop">{{.Shop}}</p>
+  <p class="amount" aria-label="{{.AmountLabel}}">{{.Amount}}</p>
+  {{if .Payable}}
+  <a class="btn primary" href="{{.UPILink}}">{{.Button}}</a>
+  {{end}}
+  <ol class="steps" aria-label="{{.WaitingTitle}}">
+    <li>{{.StepOpen}}</li>
+    <li>{{.StepApprove}}</li>
+    <li>{{.StepConfirm}}</li>
+  </ol>
+  <p class="status"><span class="pill">{{.StatusWord}}</span></p>
+  <p class="note">{{.AlreadyPaid}}</p>
+</main>
+<script src="/static/pay.js" defer></script>
+</body>
+</html>

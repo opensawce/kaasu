@@ -1,0 +1,8 @@
+body { margin: 0; font: 17px/1.6 system-ui, "Noto Sans", sans-serif; background: var(--paper); color: var(--body); }
+.pay { max-width: 28rem; margin: 0 auto; padding: var(--space-4) var(--space-3); }
+.amount { font-size: 2.4rem; font-weight: 800; color: var(--ink); margin: 0 0 var(--space-3); }
+.btn { display: block; min-height: var(--touch); line-height: var(--touch); text-align: center; border-radius: var(--radius-md); text-decoration: none; }
+.btn.primary { background: var(--green); color: #fff; font-weight: 600; }
+.steps { padding-left: 1.2rem; }
+.pill { display: inline-block; padding: 4px 10px; border-radius: 999px; background: var(--status-waiting-bg); color: var(--status-waiting-fg); font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
