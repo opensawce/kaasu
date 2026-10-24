@@ -4,6 +4,7 @@ package admin
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"html/template"
 	"net/http"
 	"strings"
@@ -87,9 +88,16 @@ func (d *Dashboard) today(w http.ResponseWriter, r *http.Request) {
 	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, istZone).UTC().Format(time.RFC3339)
 	var total int64
 	var count int
-	_ = d.DB.QueryRowContext(r.Context(), `SELECT COALESCE(SUM(amount_paise),0), count(*) FROM orders
-		WHERE state IN ('confirmed','late_paid') AND confirmed_at >= ?`, start).Scan(&total, &count)
-	srcs, active := d.sources(r.Context(), now.UTC())
+	if err := d.DB.QueryRowContext(r.Context(), `SELECT COALESCE(SUM(amount_paise),0), count(*) FROM orders
+		WHERE state IN ('confirmed','late_paid') AND confirmed_at >= ?`, start).Scan(&total, &count); err != nil {
+		http.Error(w, "unavailable", http.StatusInternalServerError)
+		return
+	}
+	srcs, active, err := d.sources(r.Context(), now.UTC())
+	if err != nil {
+		http.Error(w, "unavailable", http.StatusInternalServerError)
+		return
+	}
 	l := d.Lang
 	// Fewer than two live sources is a warning: one source is a single point of failure, none means nothing is seen.
 	data := todayData{
@@ -101,22 +109,23 @@ func (d *Dashboard) today(w http.ResponseWriter, r *http.Request) {
 		data.WarnText = "No source is sending payments right now. Pair a phone or connect email."
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
 	_ = todayTmpl.Execute(w, data)
 }
 
 // sources lists the paired devices with a health word. A device quiet for 15 minutes shows "Phone offline".
-func (d *Dashboard) sources(ctx context.Context, now time.Time) ([]sourceRow, int) {
+func (d *Dashboard) sources(ctx context.Context, now time.Time) ([]sourceRow, int, error) {
 	rows, err := d.DB.QueryContext(ctx, `SELECT label, COALESCE(last_seen_at,'') FROM devices WHERE revoked_at IS NULL ORDER BY label`)
 	if err != nil {
-		return nil, 0
+		return nil, 0, fmt.Errorf("dashboard: list sources: %w", err)
 	}
 	defer rows.Close()
 	var out []sourceRow
 	active := 0
 	for rows.Next() {
 		var label, seen string
-		if rows.Scan(&label, &seen) != nil {
-			continue
+		if err := rows.Scan(&label, &seen); err != nil {
+			return nil, 0, fmt.Errorf("dashboard: scan source: %w", err)
 		}
 		word := i18n.T(d.Lang, "status.phone_offline")
 		if t, err := time.Parse(time.RFC3339, seen); err == nil && now.Sub(t) <= 15*time.Minute {
@@ -125,15 +134,19 @@ func (d *Dashboard) sources(ctx context.Context, now time.Time) ([]sourceRow, in
 		}
 		out = append(out, sourceRow{Label: label, Word: word})
 	}
-	return out, active
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("dashboard: list sources: %w", err)
+	}
+	return out, active, nil
 }
 
 type orderRow struct{ ID, Amount, Word, Payer string }
 
 func (d *Dashboard) orders(w http.ResponseWriter, r *http.Request) {
-	rows, err := d.DB.QueryContext(r.Context(), `SELECT o.id, o.state, o.amount_paise, COALESCE(a.payer_masked,'')
-		FROM orders o LEFT JOIN (SELECT m.order_id, al.payer_masked FROM matches m JOIN alerts al ON al.id = m.alert_id) a ON a.order_id = o.id
-		ORDER BY o.created_at DESC LIMIT 50`)
+	rows, err := d.DB.QueryContext(r.Context(), `SELECT o.id, o.state, o.amount_paise,
+		COALESCE((SELECT al.payer_masked FROM matches m JOIN alerts al ON al.id = m.alert_id WHERE m.order_id = o.id ORDER BY m.created_at DESC LIMIT 1), '')
+		FROM (SELECT id, state, amount_paise, created_at FROM orders ORDER BY created_at DESC, id DESC LIMIT 50) o
+		ORDER BY o.created_at DESC, o.id DESC`)
 	if err != nil {
 		http.Error(w, "unavailable", http.StatusInternalServerError)
 		return
@@ -143,12 +156,18 @@ func (d *Dashboard) orders(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var id, state, payer string
 		var amt int64
-		if rows.Scan(&id, &state, &amt, &payer) != nil {
-			continue
+		if err := rows.Scan(&id, &state, &amt, &payer); err != nil {
+			http.Error(w, "unavailable", http.StatusInternalServerError)
+			return
 		}
 		out = append(out, orderRow{ID: id, Amount: i18n.Rupees(amt, d.Lang), Word: stateWord(d.Lang, state), Payer: maskPayer(payer)})
 	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "unavailable", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
 	_ = ordersTmpl.Execute(w, map[string]any{"Lang": string(d.Lang), "Rows": out})
 }
 
