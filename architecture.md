@@ -71,6 +71,8 @@ Headers: `X-Kaasu-Device`, `X-Kaasu-Timestamp`, `X-Kaasu-Nonce` (16 to 64 charac
 
 **Accessibility checks (issue #29, partial).** Tests read the templates and stylesheets and fail on: a missing `lang` or title, other than one `h1` per page, images without `alt`, decorative icons not hidden from screen readers, status pills without their word, removed focus outlines, buttons smaller than 44 px, and animation without a reduced-motion override. The pay page now has its heading and a visible focus ring.
 
+**AI layer (issue #46, partial).** Off by default: the feature flag, the per-feature flag and the DPDP notice acknowledgement must all be set. Input is masked (VPAs, UTRs, long account numbers, e-mail) and refused if an identifier survives masking. The answer must match a JSON schema (no extra fields, enum and length limits); anything else is refused and recorded nowhere. A monthly rupee cap blocks calls once spent (zero blocks everything). Each accepted answer writes an `ai_usage` row and an `ai.suggestion` ledger row naming the model. The package may not import states, match, orders, refunds or review; a test checks the imports.
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 
