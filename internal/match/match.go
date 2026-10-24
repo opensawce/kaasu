@@ -107,8 +107,13 @@ type candidate struct {
 
 // Process decides what one alert means. Calling it again for the same alert changes nothing.
 func (m *Matcher) Process(ctx context.Context, alertID string) error {
+	return m.st.Tx(ctx, func(tx *sql.Tx) error { return m.ProcessTx(ctx, tx, alertID) })
+}
+
+// ProcessTx is Process inside the caller's transaction, so ingest can save the alert and decide it atomically.
+func (m *Matcher) ProcessTx(ctx context.Context, tx *sql.Tx, alertID string) error {
 	ctx = ledger.WithActor(ctx, "matcher")
-	return m.st.Tx(ctx, func(tx *sql.Tx) error {
+	{
 		var n int
 		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM matches WHERE alert_id = ?`, alertID).Scan(&n); err != nil {
 			return err
@@ -120,7 +125,7 @@ func (m *Matcher) Process(ctx context.Context, alertID string) error {
 		if err != nil {
 			return err
 		}
-		exact, err := candidates(ctx, tx, a, a.amount, true)
+		exact, err := candidates(ctx, tx, a, a.amount, true, m.clk.Now().UTC().Add(-graceWindow).Format(time.RFC3339))
 		if err != nil {
 			return err
 		}
@@ -132,7 +137,7 @@ func (m *Matcher) Process(ctx context.Context, alertID string) error {
 		default:
 			return m.ambiguous(ctx, tx, alertID, exact)
 		}
-	})
+	}
 }
 
 func loadAlert(ctx context.Context, tx *sql.Tx, id string) (alertRow, error) {
@@ -146,15 +151,16 @@ func loadAlert(ctx context.Context, tx *sql.Tx, id string) (alertRow, error) {
 }
 
 // candidates finds open orders that fit the amount. exact=false means the mismatch search: base within 99 paise below.
-func candidates(ctx context.Context, tx *sql.Tx, a alertRow, amount int64, exact bool) ([]candidate, error) {
+func candidates(ctx context.Context, tx *sql.Tx, a alertRow, amount int64, exact bool, cutoff string) ([]candidate, error) {
 	var q string
 	var args []any
 	hintArgs := []any{a.accountHint, a.accountHint}
 	if exact {
 		q = `SELECT o.id, o.account_id, o.state, COALESCE(o.reference,''), o.created_at, o.expires_at, o.amount_paise, a.auto_confirm_limit_paise
 			FROM orders o JOIN receiving_accounts a ON a.id = o.account_id
-			WHERE o.amount_paise = ? AND o.state IN ('awaiting','expired','cancelled','rejected')`
-		args = append([]any{amount}, hintArgs...)
+			WHERE o.amount_paise = ? AND (o.state = 'awaiting' OR (o.state IN ('expired','cancelled','rejected') AND o.expires_at > ?))`
+		// Closed orders only count while their slot is still held; after that the amount may belong to a new order.
+		args = append([]any{amount, cutoff}, hintArgs...)
 	} else {
 		q = `SELECT o.id, o.account_id, o.state, COALESCE(o.reference,''), o.created_at, o.expires_at, o.base_amount_paise, a.auto_confirm_limit_paise
 			FROM orders o JOIN receiving_accounts a ON a.id = o.account_id
@@ -259,7 +265,7 @@ func (m *Matcher) review(ctx context.Context, tx *sql.Tx, alertID string, c cand
 }
 
 func (m *Matcher) mismatch(ctx context.Context, tx *sql.Tx, alertID string, a alertRow) error {
-	near, err := candidates(ctx, tx, a, a.amount, false)
+	near, err := candidates(ctx, tx, a, a.amount, false, "")
 	if err != nil {
 		return err
 	}

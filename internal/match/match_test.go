@@ -88,7 +88,7 @@ func TestNoAutoWithoutExactAmount(t *testing.T) {
 		}
 		sc, _ := Score(s)
 		d := Decide(sc, s, rapid.Int64Range(100, 1000000).Draw(rt, "amt"), rapid.Int64Range(0, 1000000).Draw(rt, "limit"))
-		if d.Outcome == "auto" && !(s.ExactAmount && s.AuthenticSource) {
+		if d.Outcome == "auto" && (!s.ExactAmount || !s.AuthenticSource) {
 			rt.Fatalf("auto without exact+authentic: %+v", s)
 		}
 	})
@@ -157,7 +157,9 @@ func (e env) state(t *testing.T, id string) string {
 func (e env) matches(t *testing.T, alertID string) int {
 	t.Helper()
 	var n int
-	_ = e.st.Read().QueryRow(`SELECT count(*) FROM matches WHERE alert_id=?`, alertID).Scan(&n)
+	if err := e.st.Read().QueryRow(`SELECT count(*) FROM matches WHERE alert_id=?`, alertID).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
 	return n
 }
 
@@ -429,5 +431,26 @@ func TestAlertsWithUnknownParseFieldsDoNotPanic(t *testing.T) {
 	}
 	if err := e.m.Process(e.ctx, "alt_missing"); err == nil {
 		t.Error("unknown alert id should be an error")
+	}
+}
+
+func TestOldClosedOrderWithSameAmountDoesNotBlockNewOrder(t *testing.T) {
+	e := setup(t)
+	acc, _ := e.acc.Create(e.ctx, accounts.Input{VPA: "shop@okbank", Bank: "B", DisplayName: "Shop", AutoConfirmLimitPaise: 1000000})
+	o, _, _ := e.ord.Create(e.ctx, orders.CreateInput{AmountPaise: 49907, AccountID: acc.ID, ExpiresIn: time.Hour}, "k9")
+	old := t0.Add(-3 * time.Hour).Format(time.RFC3339)
+	if err := e.st.Tx(e.ctx, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(e.ctx, `INSERT INTO orders(id,account_id,base_amount_paise,amount_paise,state,expires_at,created_at,updated_at)
+			VALUES('ord_old',?,49907,49907,'expired',?,?,?)`, acc.ID, old, old, old)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	alert := e.makeAlert(t, "device", goodParsed(49907, "777777777777"), "x")
+	if err := e.m.Process(e.ctx, alert); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.state(t, o.ID); got != "confirmed" {
+		t.Fatalf("new awaiting order must confirm despite an old expired one, got %s", got)
 	}
 }

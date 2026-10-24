@@ -37,7 +37,7 @@ var nonceRe = regexp.MustCompile(`^[A-Za-z0-9_-]{16,64}$`)
 
 // Matcher decides what an alert means for orders. It is optional until card 06 exists.
 type Matcher interface {
-	Process(ctx context.Context, alertID string) error
+	ProcessTx(ctx context.Context, tx *sql.Tx, alertID string) error
 }
 
 // Deps are the services ingest needs.
@@ -243,15 +243,14 @@ func accept(ctx context.Context, d Deps, dev devices.Device, nonce string, raw [
 		}
 		resp["alert_id"] = alertID
 		resp["duplicate"] = !isNew
+		// Deciding in the same transaction means a matching failure also rolls back the nonce, so a retry works.
+		if d.Matcher != nil {
+			return d.Matcher.ProcessTx(ctx, tx, alertID)
+		}
 		return nil
 	})
 	if err != nil {
 		return 0, nil, err
-	}
-	if d.Matcher != nil && resp["alert_id"] != nil {
-		if err := d.Matcher.Process(ctx, resp["alert_id"].(string)); err != nil {
-			return 0, nil, err
-		}
 	}
 	return status, resp, nil
 }
