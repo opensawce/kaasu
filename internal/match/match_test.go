@@ -455,3 +455,19 @@ func TestOldClosedOrderWithSameAmountDoesNotBlockNewOrder(t *testing.T) {
 		t.Fatalf("new awaiting order must confirm despite an old expired one, got %s", got)
 	}
 }
+
+// A date-only bank alert on the day of the order is timely, so a real payment auto-confirms.
+func TestDateOnlyAlertOnSameDayAutoConfirms(t *testing.T) {
+	e := setup(t)
+	acc, _ := e.acc.Create(e.ctx, accounts.Input{VPA: "shop@okbank", Bank: "B", DisplayName: "Shop", AutoConfirmLimitPaise: 1000000})
+	o, _, _ := e.ord.Create(e.ctx, orders.CreateInput{AmountPaise: 49907, AccountID: acc.ID, ExpiresIn: time.Hour}, "dayonly")
+	p := goodParsed(49907, "909090909090")
+	p.OccurredAt = time.Date(2026, 1, 1, 0, 0, 0, 0, time.FixedZone("IST", 5*3600+1800)).UTC()
+	alert := e.makeAlert(t, "device", p, "date only")
+	if err := e.m.Process(e.ctx, alert); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.state(t, o.ID); got != "confirmed" {
+		t.Fatalf("a date-only alert on the order's day should confirm, state=%s", got)
+	}
+}

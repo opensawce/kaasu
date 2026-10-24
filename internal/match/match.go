@@ -219,7 +219,13 @@ func (m *Matcher) signals(ctx context.Context, tx *sql.Tx, alertID string, a ale
 	}
 	created, _ := time.Parse(time.RFC3339, c.created)
 	expires, _ := time.Parse(time.RFC3339, c.expires)
-	s.TimingOK = !occurred.Before(created.Add(-earlyTolerance)) && !occurred.After(expires.Add(graceWindow))
+	// Bank alerts often carry only a date. That parses to midnight IST, so compare by IST day for those:
+	// a payment is timely when it falls on or after the day the order was made, and within the window.
+	floor := created.Add(-earlyTolerance)
+	if occurred.Equal(istMidnight(occurred)) {
+		floor = istMidnight(created)
+	}
+	s.TimingOK = !occurred.Before(floor) && !occurred.After(expires.Add(graceWindow))
 	return s, nil
 }
 
@@ -301,4 +307,12 @@ func (m *Matcher) insertMatch(ctx context.Context, tx *sql.Tx, alertID, orderID,
 		return fmt.Errorf("insert match: %w", err)
 	}
 	return nil
+}
+
+var istZone = time.FixedZone("IST", 5*3600+30*60)
+
+// istMidnight is the start of the IST day that t falls in.
+func istMidnight(t time.Time) time.Time {
+	l := t.In(istZone)
+	return time.Date(l.Year(), l.Month(), l.Day(), 0, 0, 0, 0, istZone).UTC()
 }
