@@ -22,7 +22,7 @@ type Config struct {
 
 func defaults() Config {
 	return Config{
-		PublicAddr:   ":8080",
+		PublicAddr:   ":8080", // :443 + TLS is deferred to the deploy card; set KAASU_PUBLIC_ADDR behind a proxy
 		IngestAddr:   ":8443",
 		AdminAddr:    "127.0.0.1:9000",
 		DatabasePath: "kaasu.db",

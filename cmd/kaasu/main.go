@@ -44,7 +44,11 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	}
 }
 
-func serve(_ []string, getenv func(string) string, stderr io.Writer) int {
+func serve(args []string, getenv func(string) string, stderr io.Writer) int {
+	if len(args) > 0 {
+		fmt.Fprintf(stderr, "serve: unexpected arguments %q (configure with KAASU_CONFIG or KAASU_* env)\n", args)
+		return 2
+	}
 	cfg, err := config.Load(getenv, getenv("KAASU_CONFIG"))
 	if err != nil {
 		fmt.Fprintln(stderr, "config:", err)
@@ -61,7 +65,13 @@ func serve(_ []string, getenv func(string) string, stderr io.Writer) int {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	<-ctx.Done()
+	code := 0
+	select {
+	case <-ctx.Done():
+	case err := <-s.Err():
+		log.Error("listener failed", "err", err)
+		code = 1
+	}
 	log.Info("shutting down")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -69,5 +79,5 @@ func serve(_ []string, getenv func(string) string, stderr io.Writer) int {
 		log.Error("shutdown", "err", err)
 		return 1
 	}
-	return 0
+	return code
 }

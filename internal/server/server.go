@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/opensawce/kaasu/internal/config"
@@ -29,10 +30,12 @@ type Server struct {
 	cfg config.Config
 	log *slog.Logger
 	ls  []*listener
+	// errc reports a listener that stopped for any reason other than Shutdown.
+	errc chan error
 }
 
 func New(cfg config.Config, log *slog.Logger) *Server {
-	return &Server{cfg: cfg, log: log}
+	return &Server{cfg: cfg, log: log, errc: make(chan error, 3)}
 }
 
 func healthz(w http.ResponseWriter, _ *http.Request) {
@@ -83,6 +86,7 @@ func (s *Server) Start() error {
 		go func(l *listener) {
 			if err := l.srv.Serve(l.ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				s.log.Error("serve failed", "listener", l.name, "err", err)
+				s.errc <- fmt.Errorf("serve %s: %w", l.name, err)
 			}
 		}(l)
 	}
@@ -112,13 +116,22 @@ func (s *Server) Addrs() Addrs {
 	return a
 }
 
-// Shutdown stops accepting and waits for in-flight requests until ctx ends.
+// Err delivers the first unexpected listener failure; the caller should then Shutdown and exit nonzero.
+func (s *Server) Err() <-chan error { return s.errc }
+
+// Shutdown stops accepting on all listeners at once, then waits for in-flight requests until ctx ends.
 func (s *Server) Shutdown(ctx context.Context) error {
-	var errs []error
-	for _, l := range s.ls {
-		if err := l.srv.Shutdown(ctx); err != nil {
-			errs = append(errs, fmt.Errorf("shutdown %s: %w", l.name, err))
-		}
+	errs := make([]error, len(s.ls))
+	var wg sync.WaitGroup
+	for i, l := range s.ls {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := l.srv.Shutdown(ctx); err != nil {
+				errs[i] = fmt.Errorf("shutdown %s: %w", l.name, err)
+			}
+		}()
 	}
+	wg.Wait()
 	return errors.Join(errs...)
 }
