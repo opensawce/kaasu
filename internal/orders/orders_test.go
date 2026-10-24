@@ -257,3 +257,39 @@ func TestPoolFailureRollsBackOrder(t *testing.T) {
 		t.Errorf("no order may survive a failed reservation: n=%d err=%v", n, err)
 	}
 }
+
+func TestUnknownOrderErrors(t *testing.T) {
+	e := setup(t)
+	if _, err := e.svc.Get(e.ctx, "ord_nope"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("get: %v", err)
+	}
+	if _, err := e.svc.Cancel(e.ctx, "ord_nope"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("cancel: %v", err)
+	}
+}
+
+// A new order must not jump the queue: older queued orders get the freed slots first.
+func TestNewOrderDoesNotJumpTheQueue(t *testing.T) {
+	e := setup(t)
+	for i := 0; i < 100; i++ {
+		if _, _, err := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900, ExpiresIn: time.Minute}, fmt.Sprintf("a%d", i)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	waiting, _, err := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900, ExpiresIn: 60 * time.Minute}, "waiting")
+	if err != nil || waiting.State != "queued" {
+		t.Fatalf("setup: %+v %v", waiting, err)
+	}
+	e.clk.Advance(12 * time.Minute) // every first-batch hold (1 min + 10 min grace) has ended
+	newer, _, err := e.svc.Create(e.ctx, CreateInput{AmountPaise: 49900, ExpiresIn: 60 * time.Minute}, "newer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	old, _ := e.svc.Get(e.ctx, waiting.ID)
+	if old.State != "awaiting" || old.AmountPaise != 49900 {
+		t.Errorf("the older queued order must be promoted first: %+v", old)
+	}
+	if newer.State != "awaiting" || newer.AmountPaise == old.AmountPaise {
+		t.Errorf("the new order gets the next free amount: %+v", newer)
+	}
+}
