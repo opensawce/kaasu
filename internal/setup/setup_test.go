@@ -58,6 +58,23 @@ func TestWizardCreatesOneRupeeTestOrder(t *testing.T) {
 	if o.AmountPaise != 100 || o.State != "awaiting" {
 		t.Errorf("test order: %+v", o)
 	}
+	var n int
+	if err := w.st.Read().QueryRow(`SELECT count(*) FROM settings WHERE key = ?`, TestOrderSettingPrefix+o.ID).Scan(&n); err != nil || n != 1 {
+		t.Errorf("the test order must be marked in settings: n=%d err=%v", n, err)
+	}
+}
+
+func TestReusingTheReferenceDoesNotMarkAnOrder(t *testing.T) {
+	w, acc, _, ctx := setup(t)
+	o, _, err := w.orders.Create(ctx, orders.CreateInput{AmountPaise: 5000, AccountID: acc, Reference: TestReference}, "customer-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	_ = w.st.Read().QueryRow(`SELECT count(*) FROM settings WHERE key = ?`, TestOrderSettingPrefix+o.ID).Scan(&n)
+	if n != 0 {
+		t.Error("an ordinary order with the same reference must not be marked")
+	}
 }
 
 func TestHelpShownAfterThreeMinutes(t *testing.T) {
