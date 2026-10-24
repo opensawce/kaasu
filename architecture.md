@@ -63,6 +63,8 @@ Headers: `X-Kaasu-Device`, `X-Kaasu-Timestamp`, `X-Kaasu-Nonce` (16 to 64 charac
 
 **Voice announcements (issue #21, partial).** Only a confirmed or late-paid payment is ever spoken (`voice.Announcement`, tested over every state). The amount is read from the catalogue, in whole rupees when the paise are zero. The voice language is chosen separately from the screen language. `voice.js` speaks through the browser and remembers the last 50 order ids in session storage, so a reconnect never repeats a payment.
 
+**Merchant dashboard, first slice (issue #30, partial).** Mounted on the admin listener only. Sign-in is the TOTP form; every other page needs a session. Today shows money received today (IST), and a source health list where a device counts as live if it was seen in the last 15 minutes. Fewer than two live sources shows a warning; none says nothing is sending. Orders show the masked payer; a test checks a full VPA never reaches an admin page.
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 
