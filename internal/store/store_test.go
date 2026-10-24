@@ -78,6 +78,8 @@ func seed(t *testing.T, s *Store) {
 		`INSERT INTO receiving_accounts(id,vpa,bank,display_name,created_at) VALUES('acc1','shop@okbank','Bank','Shop','2026-01-01T00:00:00Z')`,
 		`INSERT INTO orders(id,account_id,base_amount_paise,amount_paise,state,idempotency_key,request_hash,expires_at,created_at,updated_at)
 		 VALUES('o1','acc1',49900,49907,'awaiting','k1','h1','2026-01-01T00:15:00Z','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')`,
+		`INSERT INTO orders(id,account_id,base_amount_paise,amount_paise,state,idempotency_key,request_hash,expires_at,created_at,updated_at)
+		 VALUES('o3','acc1',49900,49908,'awaiting','k3','h3','2026-01-01T00:15:00Z','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')`,
 		`INSERT INTO devices(id,label,kind,public_key,paired_at) VALUES('d1','Phone','android',x'00','2026-01-01T00:00:00Z')`,
 		`INSERT INTO evidence(id,source,device_id,received_at,raw_hash,body) VALUES('e1','device','d1','2026-01-01T00:01:00Z','rh1',x'00')`,
 		`INSERT INTO alerts(id,evidence_id,amount_paise,utr,occurred_at,parsed_at) VALUES('a1','e1',49907,'UTR1','2026-01-01T00:01:00Z','2026-01-01T00:01:01Z')`,
@@ -93,7 +95,7 @@ func TestConstraints(t *testing.T) {
 	s := open(t)
 	seed(t, s)
 	tests := []struct{ name, sql string }{
-		{"reservation unique per account and amount", `INSERT INTO amount_reservations(account_id,amount_paise,order_id,reserved_until) VALUES('acc1',49907,'o1','2026-01-01T01:00:00Z')`},
+		{"reservation unique per account and amount", `INSERT INTO amount_reservations(account_id,amount_paise,order_id,reserved_until) VALUES('acc1',49907,'o3','2026-01-01T01:00:00Z')`},
 		{"UTR unique", `INSERT INTO alerts(id,evidence_id,amount_paise,utr,occurred_at,parsed_at) VALUES('a2','e1',100,'UTR1','2026-01-01T00:02:00Z','2026-01-01T00:02:01Z')`},
 		{"one match per alert", `INSERT INTO matches(id,alert_id,order_id,score,decision,created_at) VALUES('m2','a1','o1',90,'auto','2026-01-01T00:03:00Z')`},
 		{"nonce unique per device", `INSERT INTO nonces(device_id,nonce,seen_at) VALUES('d1','n1','2026-01-01T00:00:00Z')`},

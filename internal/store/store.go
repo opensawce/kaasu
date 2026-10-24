@@ -33,7 +33,7 @@ func dsn(path, extra string) string {
 	q.Add("_pragma", "synchronous(NORMAL)")
 	if extra != "" {
 		k, v, _ := strings.Cut(extra, "=")
-		q.Set(k, v)
+		q.Add(k, v)
 	}
 	return "file:" + path + "?" + q.Encode()
 }
@@ -49,7 +49,7 @@ func Open(path string) (*Store, error) {
 		_ = w.Close()
 		return nil, fmt.Errorf("open %s: %w", path, err)
 	}
-	r, err := sql.Open("sqlite", dsn(path, ""))
+	r, err := sql.Open("sqlite", dsn(path, "_pragma=query_only(1)"))
 	if err != nil {
 		_ = w.Close()
 		return nil, fmt.Errorf("open reader: %w", err)
@@ -69,8 +69,8 @@ func (s *Store) Tx(ctx context.Context, fn func(*sql.Tx) error) error {
 	if err != nil {
 		return fmt.Errorf("begin: %w", err)
 	}
+	defer func() { _ = tx.Rollback() }() // no-op after Commit; releases the writer if fn panics
 	if err := fn(tx); err != nil {
-		_ = tx.Rollback()
 		return err
 	}
 	if err := tx.Commit(); err != nil {
