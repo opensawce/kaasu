@@ -55,6 +55,8 @@ Headers: `X-Kaasu-Device`, `X-Kaasu-Timestamp`, `X-Kaasu-Nonce` (16 to 64 charac
 
 **Customer pay page (issue #23).** `/pay/{id}` shows the exact amount, one primary button that names the amount and opens the UPI link, the waiting steps, and "Already paid? Don't pay again." Copy comes only from the catalogue. Waiting states never say "failed". `/pay/{id}/status` returns the state alone; `pay.js` polls it every two seconds with no third-party code. The page has no inline script, no third-party request, and stays under 30 KB. Language comes from `?lang=` (kept in a cookie), then the browser, then the shop default.
 
+**Payment confirmed page (issue #24).** `/pay/{id}/done` shows the success screen only when the order is confirmed or late-paid; anything else redirects back to the pay page, and the URL can never make success appear. It shows the amount from the order (a `?amount=` query is ignored), a live "time since confirmed" counter, the UTR, time, reference and a six-character check code. The code is an HMAC of the order, the confirmation time and the amount, so the shopkeeper can compare it. `/pay/{id}/receipt` is the printable receipt (`?format=txt` for plain text). The tick animation respects reduced motion. Paisu never appears on customer pages.
+
 ### Order states
 <img src="assets/diagrams/order-states.png" alt="Order state machine" width="420">
 
@@ -125,7 +127,7 @@ SQLite in WAL mode, STRICT tables, foreign keys on, one writer (`BEGIN IMMEDIATE
 
 | # | Threat | Defence | Test (#57) |
 |---|---|---|---|
-| T1 | Fake payment: forged screenshot, hand-typed UTR, made-up alert | Only `internal/match` confirms, and only from a verified alert; manual UTR goes to review | Forged and unsigned alerts never confirm |
+| T1 | Fake payment: forged screenshot, hand-typed UTR, made-up alert | Only `internal/match` confirms, and only from a verified alert; manual UTR goes to review. The shopkeeper can also compare the six-character check code on the customer's success page or receipt with their own app: it is an HMAC (key kept in settings, stable across restarts) that binds the order, the confirmation time and the amount, so a forged screenshot fails the comparison | Forged and unsigned alerts never confirm |
 | T2 | Replayed or edited device alert | Ed25519 over body hash, timestamp and nonce; 60 s window; nonce store | Replay, clock skew, tampered body rejected |
 | T3 | Spoofed bank email | DKIM on the raw message; bank domain allow-list | Bad signature and look-alike domain ignored |
 | T4 | Wrong order matched (amount collision, late alert) | Unique paise per open order; ambiguous or late matches go to review | Collision and late-alert scenarios |
