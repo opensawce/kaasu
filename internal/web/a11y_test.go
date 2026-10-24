@@ -58,10 +58,14 @@ func TestImagesHaveAlt(t *testing.T) {
 	}
 }
 
+var svgTag = regexp.MustCompile(`<svg\b[^>]*>`)
+
 func TestSvgIconsAreHidden(t *testing.T) {
 	for name, s := range templates(t) {
-		if strings.Contains(s, "<svg") && !strings.Contains(s, `aria-hidden="true"`) {
-			t.Errorf("%s: decorative svg must be aria-hidden", name)
+		for _, tag := range svgTag.FindAllString(s, -1) {
+			if !strings.Contains(tag, `aria-hidden="true"`) {
+				t.Errorf("%s: decorative svg must be aria-hidden: %s", name, tag)
+			}
 		}
 	}
 }
@@ -85,6 +89,10 @@ func TestFocusVisibleAndTouchTargets(t *testing.T) {
 	css := string(b)
 	if regexp.MustCompile(`outline:\s*none`).MatchString(css) {
 		t.Error("removing outlines needs a visible replacement; none found")
+	}
+	focus := regexp.MustCompile(`\.btn:focus-visible\s*\{([^}]*)\}`).FindStringSubmatch(css)
+	if focus == nil || !regexp.MustCompile(`outline:\s*[1-9][0-9]*px\s+solid`).MatchString(focus[1]) {
+		t.Error(".btn:focus-visible must draw a visible focus ring")
 	}
 	if !strings.Contains(css, "min-height: var(--touch)") {
 		t.Error("buttons must be at least the 44 px touch size")
