@@ -161,3 +161,11 @@ func indianFormat(paise int64) string {
 	}
 	return fmt.Sprintf("%s.%02d", b.String(), paise%100)
 }
+
+func TestThirteenDigitReferenceIsRejected(t *testing.T) {
+	p, _ := ForSender("VM-SBIUPI")
+	body := "Your a/c no. XXXXXXXX1234 is credited by Rs.1,250.00 on 23Oct26 transfer from RAVI KUMAR Ref No 6298123456789 -SBI"
+	if _, err := p.Parse(body); err != ErrUnknownFormat {
+		t.Errorf("13-digit reference must not be truncated to 12: %v", err)
+	}
+}
