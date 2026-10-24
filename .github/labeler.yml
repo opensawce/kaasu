@@ -1,0 +1,18 @@
+area:server:
+  - changed-files:
+      - any-glob-to-any-file: ["internal/**", "cmd/**"]
+area:web:
+  - changed-files:
+      - any-glob-to-any-file: ["web/**", "internal/web/**"]
+area:docs:
+  - changed-files:
+      - any-glob-to-any-file: ["**/*.md", "docs/**"]
+area:security:
+  - changed-files:
+      - any-glob-to-any-file: ["internal/secrets/**", "internal/adminauth/**", "internal/ingest/**", "SECURITY.md"]
+area:i18n:
+  - changed-files:
+      - any-glob-to-any-file: ["i18n/**"]
+area:infra:
+  - changed-files:
+      - any-glob-to-any-file: [".github/**", "deploy/**", "Dockerfile", "compose.yaml", "install.sh"]
