@@ -1,0 +1,58 @@
+name: dependabot-automerge
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: write
+  pull-requests: write
+concurrency:
+  group: dependabot-automerge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  automerge:
+    # Dependabot's own PRs in this repo only. This workflow never checks out pull request code: it
+    # reads PR metadata, approves, and turns on auto-merge. Required checks decide whether it merges.
+    if: >-
+      github.actor == 'dependabot[bot]' &&
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.repository == 'opensawce/kaasu'
+    runs-on: ubuntu-latest
+    steps:
+      - id: meta
+        uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a # v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      # The issue says /web only. The ecosystem alone is not enough: a future npm entry outside /web
+      # would slip through, so check every changed path instead.
+      - name: Only web dependency bumps
+        id: scope
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          changed=$(gh pr view "$PR" --json files --jq '.files[].path')
+          if [ -z "$changed" ]; then
+            echo "no files changed; leaving it for a human"
+            exit 0
+          fi
+          if printf '%s\n' "$changed" | grep -qv '^web/'; then
+            echo "::notice::changes outside web/; leaving it for a human"
+            exit 0
+          fi
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+      - name: Approve and enable auto-merge
+        if: >-
+          steps.scope.outputs.ok == 'true' &&
+          steps.meta.outputs.package-ecosystem == 'npm_and_yarn' &&
+          steps.meta.outputs.update-type != 'version-update:semver-major'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if [ "$(gh pr view "$PR" --json reviewDecision --jq .reviewDecision)" != "APPROVED" ]; then
+            gh pr review --approve "$PR"
+          fi
+          if [ -z "$(gh pr view "$PR" --json autoMergeRequest --jq '.autoMergeRequest // empty')" ]; then
+            gh pr merge --auto --squash "$PR"
+          fi

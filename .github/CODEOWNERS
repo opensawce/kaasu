@@ -15,3 +15,8 @@
 
 # Everything else
 *                     @manish-9245 @scoder5
+
+# Website dependency bumps: no owner, so the bot's approval is enough once required checks pass.
+# These must stay after `*` — the last matching pattern wins, and an ownerless line removes ownership.
+/web/package.json
+/web/package-lock.json
