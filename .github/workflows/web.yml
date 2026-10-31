@@ -1,7 +1,7 @@
 name: web
 on:
+  # Runs on every pull request (no path filter) so `web-test` can be a required check on any PR.
   pull_request:
-    paths: ['web/**', '.github/workflows/web.yml']
   push:
     branches: [main]
     paths: ['web/**', '.github/workflows/web.yml']
@@ -12,7 +12,7 @@ concurrency:
   group: web-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  test:
+  web-test:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: web } }
     steps:
@@ -24,9 +24,9 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with: { name: site, path: web/dist, retention-days: 7 }
   deploy:
-    needs: test
-    # Secrets are not available to pull requests from forks.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    needs: web-test
+    # Secrets are not available to pull requests from forks or to Dependabot.
+    if: github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
