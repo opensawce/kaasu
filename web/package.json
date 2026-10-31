@@ -11,7 +11,7 @@
     "test": "astro build && node --test test/site.test.mjs"
   },
   "dependencies": {
-    "@astrojs/starlight": "^0.42.6",
+    "@astrojs/starlight": "^0.42.7",
     "@fontsource-variable/bricolage-grotesque": "^5.2.0",
     "@fontsource/ibm-plex-mono": "^5.2.0",
     "@fontsource/ibm-plex-sans": "^5.2.0",
