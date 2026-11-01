@@ -3,7 +3,8 @@
 /internal/parsers/    @manish-9245 @AdiKulkarni21 @scoder5
 /internal/states/     @manish-9245 @AdiKulkarni21 @scoder5
 /internal/ledger/     @manish-9245 @AdiKulkarni21 @scoder5
-/internal/auth/       @manish-9245 @AdiKulkarni21 @scoder5
+/internal/adminauth/  @manish-9245 @AdiKulkarni21 @scoder5
+/internal/ingest/     @manish-9245 @AdiKulkarni21 @scoder5
 /internal/evidence/   @manish-9245 @AdiKulkarni21 @scoder5
 /internal/secrets/    @manish-9245 @AdiKulkarni21 @scoder5
 
